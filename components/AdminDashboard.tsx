@@ -126,6 +126,57 @@ const AdminDashboard: React.FC = () => {
       });
   };
 
+  // Reverse geocoding (coords -> address) for auto-location
+  const getAddressFromCoords = async (lat: number, lon: number): Promise<string> => {
+    const isReady = await waitForKakao();
+    if (!isReady) return `위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`;
+
+    return new Promise((resolve) => {
+       const geocoder = new window.kakao.maps.services.Geocoder();
+       geocoder.coord2Address(lon, lat, (result: any, status: any) => {
+          if (status === window.kakao.maps.services.Status.OK) {
+              resolve(result[0].address.address_name);
+          } else {
+              resolve(`위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`);
+          }
+       });
+    });
+  };
+
+  const getLocationForAdmin = () => {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const address = await getAddressFromCoords(lat, lon);
+        
+        setNewWorker(prev => ({
+            ...prev,
+            location: {
+                latitude: lat,
+                longitude: lon,
+                addressString: address
+            }
+        }));
+      },
+      (error) => {
+        console.log("Admin location auto-fetch failed", error);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
+  const toggleAddMode = () => {
+      const nextState = !isAdding;
+      setIsAdding(nextState);
+      if (nextState) {
+          // Attempt to fetch location automatically when opening add form
+          getLocationForAdmin();
+      }
+  };
+
   const handleSearchAddress = async (isEdit: boolean) => {
       const targetAddr = isEdit ? editForm.location?.addressString : newWorker.location.addressString;
       if (!targetAddr) {
@@ -251,7 +302,9 @@ const AdminDashboard: React.FC = () => {
       let finalLng = editForm.location?.longitude ?? null;
       let finalAddr = editForm.location?.addressString || '';
 
-      if ((!finalLat || !finalLng) && finalAddr) {
+      // Fallback: If lat/lng is missing or user changed text without clicking search
+      if (finalAddr) {
+          // Double check if the coordinates match the text or if coordinates are missing
           const coords = await getCoordsFromAddress(finalAddr);
           if (coords) {
               finalLat = coords.lat;
@@ -452,7 +505,7 @@ const AdminDashboard: React.FC = () => {
             </h2>
             <div className="flex gap-2">
                 <button
-                    onClick={() => setIsAdding(!isAdding)}
+                    onClick={toggleAddMode}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
                         isAdding ? 'bg-slate-800 text-white' : 'bg-brand-600 text-white hover:bg-brand-700'
                     }`}
@@ -531,7 +584,7 @@ const AdminDashboard: React.FC = () => {
                             onChange={handleNewWorkerChange}
                             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearchAddress(false))}
                             className="flex-1 p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
-                            placeholder="거주지 또는 희망 근무지"
+                            placeholder="거주지 또는 희망 근무지 (자동 위치 확인 중...)"
                         />
                         <button 
                             type="button" 

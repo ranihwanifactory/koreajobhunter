@@ -58,7 +58,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
 
         if (docSnap.exists()) {
           const data = docSnap.data() as Partial<WorkerProfile>;
-          // Ensure all fields are defined to avoid undefined errors later
           setFormData({
             name: data.name || '',
             phone: data.phone || '',
@@ -73,12 +72,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
             introduction: data.introduction || '',
             idCardImageUrl: data.idCardImageUrl || '',
             safetyCertImageUrl: data.safetyCertImageUrl || '',
-            isAgreed: !!data.isAgreed // coerce to boolean
+            isAgreed: !!data.isAgreed
           });
-          
-          if (data.isAgreed) {
-             // Optional: could auto-show submission state, but editing is better
-          }
         }
       } catch (error) {
         console.error("Error loading document: ", error);
@@ -89,6 +84,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
 
     fetchData();
   }, [user]);
+
+  // Auto-fetch location if no location data exists
+  useEffect(() => {
+    if (!isFetchingData && !formData.location.latitude && !formData.location.addressString) {
+      getLocation(true); // silent mode
+    }
+  }, [isFetchingData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -128,7 +130,17 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     try {
       const isReady = await waitForKakao();
       if (!isReady) {
-        throw new Error("Kakao Maps API not loaded");
+        // Just set coords if Kakao fails
+        setFormData(prev => ({
+            ...prev,
+            location: {
+              latitude: lat,
+              longitude: lon,
+              addressString: prev.location.addressString || `위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`
+            }
+          }));
+        setIsLoading(false);
+        return;
       }
 
       const geocoder = new window.kakao.maps.services.Geocoder();
@@ -157,14 +169,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
       });
     } catch (error) {
       console.error("Geocoding failed:", error);
-      setFormData(prev => ({
-        ...prev,
-        location: {
-          latitude: lat,
-          longitude: lon,
-          addressString: `위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`
-        }
-      }));
       setIsLoading(false);
     }
   };
@@ -224,11 +228,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     }
   };
 
-  const getLocation = () => {
-    setIsLoading(true);
+  const getLocation = (silent = false) => {
+    if (!silent) setIsLoading(true);
     if (!navigator.geolocation) {
-      alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
-      setIsLoading(false);
+      if (!silent) {
+        alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -239,8 +245,10 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
         getAddressFromCoords(lat, lon);
       },
       (error) => {
-        alert(`위치 정보를 가져올 수 없습니다: ${error.message}`);
-        setIsLoading(false);
+        if (!silent) {
+          alert(`위치 정보를 가져올 수 없습니다: ${error.message}`);
+          setIsLoading(false);
+        }
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -315,7 +323,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
           idCardUrl = await uploadImage(idCardFile, `workers/${user.uid}/idCard_${Date.now()}`);
         } catch (uploadError) {
           console.error("ID Card upload failed", uploadError);
-          // Continue or halt? Let's halt for now or use empty
           throw new Error("신분증 업로드에 실패했습니다.");
         }
       }
@@ -556,7 +563,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
                   </button>
                   <button
                     type="button"
-                    onClick={getLocation}
+                    onClick={() => getLocation(false)}
                     disabled={isLoading}
                     className="bg-slate-700 text-white px-4 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center min-w-[3rem]"
                     aria-label="현위치 찾기"
