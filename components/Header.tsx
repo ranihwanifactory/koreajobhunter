@@ -1,7 +1,10 @@
-import React from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { BUSINESS_INFO } from '../constants';
-import { auth } from '../services/firebase';
+import { auth, db } from '../services/firebase';
 import { User } from 'firebase/auth';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { AppNotification } from '../types';
 
 interface HeaderProps {
   user: User | null;
@@ -11,6 +14,52 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminView }) => {
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNoti, setShowNoti] = useState(false);
+  const [hasNew, setHasNew] = useState(false);
+  const notiRef = useRef<HTMLDivElement>(null);
+
+  // 알림 가져오기
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(10));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppNotification));
+      setNotifications(list);
+
+      // 읽지 않은 알림 체크
+      const lastReadTime = localStorage.getItem('lastReadNotiTime');
+      if (list.length > 0) {
+        // 마지막으로 읽은 시간보다 최신 알림이 있으면 뱃지 표시
+        if (!lastReadTime || new Date(list[0].createdAt) > new Date(lastReadTime)) {
+          setHasNew(true);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // 외부 클릭 시 닫기
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notiRef.current && !notiRef.current.contains(event.target as Node)) {
+        setShowNoti(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleBellClick = () => {
+    setShowNoti(!showNoti);
+    if (!showNoti && notifications.length > 0) {
+      setHasNew(false);
+      localStorage.setItem('lastReadNotiTime', notifications[0].createdAt);
+    }
+  };
+
   const handleShare = async () => {
     const shareData = {
       title: BUSINESS_INFO.name,
@@ -76,13 +125,55 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
             <i className="fas fa-share-alt"></i>
           </button>
           
-          <button 
-            onClick={handleInstallInfo}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors hidden sm:flex"
-            aria-label="앱 설치 안내"
-          >
-            <i className="fas fa-download text-sm"></i>
-          </button>
+          {/* Notification Bell */}
+          <div className="relative" ref={notiRef}>
+            <button 
+              onClick={handleBellClick}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors relative"
+              aria-label="알림"
+            >
+              <i className={`fas fa-bell ${hasNew ? 'text-brand-600 animate-pulse' : ''}`}></i>
+              {hasNew && (
+                <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {showNoti && (
+              <div className="absolute top-12 right-0 w-80 bg-white shadow-xl rounded-xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                  <h3 className="font-bold text-sm text-gray-800">알림 센터</h3>
+                  <span className="text-xs text-gray-500">최근 {notifications.length}개</span>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500 text-sm">
+                      새로운 알림이 없습니다.
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-gray-100">
+                      {notifications.map((noti) => (
+                        <li key={noti.id} className="p-4 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${noti.type === 'job' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                              <i className={`fas ${noti.type === 'job' ? 'fa-briefcase' : 'fa-info-circle'} text-xs`}></i>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-gray-800 mb-1">{noti.title}</h4>
+                              <p className="text-xs text-gray-600 leading-snug mb-1">{noti.message}</p>
+                              <span className="text-[10px] text-gray-400">
+                                {new Date(noti.createdAt).toLocaleDateString()} {new Date(noti.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {user && (
             <button 

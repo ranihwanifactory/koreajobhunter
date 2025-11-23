@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { db, storage } from '../services/firebase';
 import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { WorkerProfile, JobType, JobPosting } from '../types';
+import { WorkerProfile, JobType, JobPosting, AppNotification } from '../types';
 import { JOB_TYPES_LIST } from '../constants';
 import WorkerMap from './WorkerMap';
 
@@ -533,6 +533,20 @@ const AdminDashboard: React.FC = () => {
       
       const docRef = await addDoc(collection(db, 'job_postings'), jobData);
       setJobs(prev => [{ ...jobData, id: docRef.id }, ...prev]);
+
+      // Notification 생성
+      try {
+        const notificationData: Omit<AppNotification, 'id'> = {
+          title: '새로운 일자리 등록',
+          message: `${newJob.companyName}에서 인력을 구합니다. (${newJob.content})`,
+          createdAt: new Date().toISOString(),
+          type: 'job',
+          linkId: docRef.id
+        };
+        await addDoc(collection(db, 'notifications'), notificationData);
+      } catch (notifError) {
+        console.error("Failed to send notification:", notifError);
+      }
       
       setIsAddingJob(false);
       setNewJob({
@@ -545,7 +559,7 @@ const AdminDashboard: React.FC = () => {
         isUrgent: false,
         createdAt: ''
       });
-      alert('일자리가 등록되었습니다.');
+      alert('일자리가 등록되었습니다. 알림이 발송되었습니다.');
     } catch (error) {
       console.error("Error adding job:", error);
       alert('등록 중 오류가 발생했습니다.');

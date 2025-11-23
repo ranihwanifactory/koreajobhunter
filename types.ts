@@ -50,3 +50,12 @@ export interface JobPosting {
   isUrgent?: boolean;     // 긴급 여부
   createdAt: string;
 }
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  type: 'job' | 'notice';
+  linkId?: string;
+}
