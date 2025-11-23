@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { db, storage } from '../services/firebase';
 import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
@@ -12,6 +13,7 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<WorkerProfile>>({});
+  const [editFiles, setEditFiles] = useState<{idCard?: File, safetyCert?: File}>({});
 
   // States for Admin Registration
   const [isAdding, setIsAdding] = useState(false);
@@ -74,21 +76,76 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Safe upload function
+  const uploadImageSafe = async (file: File, path: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const storageRef = ref(storage, path);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed',
+        null,
+        (error) => {
+          console.error("Upload error:", error);
+          reject(error);
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            resolve(downloadURL);
+          });
+        }
+      );
+    });
+  };
+
   // --- Edit Logic ---
   const startEdit = (worker: WorkerProfile) => {
     setEditingId(worker.id!);
-    setEditForm({ ...worker });
+    // Initialize with safe defaults for every field
+    setEditForm({ 
+        name: worker.name || '',
+        phone: worker.phone || '',
+        bankName: worker.bankName || '',
+        accountNumber: worker.accountNumber || '',
+        desiredJobs: worker.desiredJobs || [],
+        introduction: worker.introduction || '',
+        idCardImageUrl: worker.idCardImageUrl || '',
+        safetyCertImageUrl: worker.safetyCertImageUrl || '',
+        location: worker.location ? {
+            latitude: worker.location.latitude ?? null,
+            longitude: worker.location.longitude ?? null,
+            addressString: worker.location.addressString || ''
+        } : { latitude: null, longitude: null, addressString: '' }
+    });
+    setEditFiles({});
     setIsAdding(false); // Close add form if open
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditForm({});
+    setEditFiles({});
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setEditForm(prev => ({ ...prev, [name]: value }));
+    if (name === 'addressString') {
+        setEditForm(prev => ({ 
+            ...prev, 
+            location: { 
+                latitude: prev.location?.latitude ?? null,
+                longitude: prev.location?.longitude ?? null,
+                addressString: value 
+            } 
+        }));
+    } else {
+        setEditForm(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'idCard' | 'safetyCert') => {
+      if (e.target.files && e.target.files[0]) {
+          setEditFiles(prev => ({...prev, [type]: e.target.files![0]}));
+      }
   };
 
   const toggleEditJob = (jobValue: JobType) => {
@@ -105,15 +162,52 @@ const AdminDashboard: React.FC = () => {
   const saveEdit = async () => {
     if (!editingId || !editForm) return;
 
+    const confirmMsg = "변경된 내용을 저장하시겠습니까?";
+    if (!window.confirm(confirmMsg)) return;
+
     try {
-      const workerRef = doc(db, 'workers', editingId);
-      await updateDoc(workerRef, {
-        ...editForm,
-        updatedAt: new Date().toISOString()
-      });
+      let idCardUrl = editForm.idCardImageUrl || '';
+      let safetyCertUrl = editForm.safetyCertImageUrl || '';
       
-      setWorkers(prev => prev.map(w => w.id === editingId ? { ...w, ...editForm, updatedAt: new Date().toISOString() } as WorkerProfile : w));
+      const timestamp = Date.now();
+      
+      // Handle file uploads if any
+      if (editFiles.idCard) {
+         idCardUrl = await uploadImageSafe(editFiles.idCard, `workers/${editingId}/idCard_${timestamp}`);
+      }
+      
+      if (editFiles.safetyCert) {
+         safetyCertUrl = await uploadImageSafe(editFiles.safetyCert, `workers/${editingId}/safetyCert_${timestamp}`);
+      }
+
+      // Safe string helper
+      const safeStr = (val: string | undefined | null) => val || '';
+
+      // Sanitized data for update - explicitly handling undefined/null
+      const updateData = {
+          name: safeStr(editForm.name),
+          phone: safeStr(editForm.phone),
+          bankName: safeStr(editForm.bankName),
+          accountNumber: safeStr(editForm.accountNumber),
+          introduction: safeStr(editForm.introduction),
+          desiredJobs: editForm.desiredJobs || [],
+          location: editForm.location || { latitude: null, longitude: null, addressString: '' },
+          idCardImageUrl: safeStr(idCardUrl),
+          safetyCertImageUrl: safeStr(safetyCertUrl),
+          updatedAt: new Date().toISOString()
+      };
+
+      const workerRef = doc(db, 'workers', editingId);
+      await updateDoc(workerRef, updateData);
+      
+      // Update local list
+      setWorkers(prev => prev.map(w => w.id === editingId ? { 
+          ...w, 
+          ...updateData
+      } as WorkerProfile : w));
+      
       setEditingId(null);
+      setEditFiles({});
       alert('수정되었습니다.');
     } catch (error) {
       console.error("Error updating worker:", error);
@@ -146,27 +240,6 @@ const AdminDashboard: React.FC = () => {
       if (e.target.files && e.target.files[0]) {
           setNewFiles(prev => ({...prev, [type]: e.target.files![0]}));
       }
-  };
-
-  // Safe upload function
-  const uploadImageSafe = async (file: File, path: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const storageRef = ref(storage, path);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      uploadTask.on('state_changed',
-        null,
-        (error) => {
-          console.error("Upload error:", error);
-          reject(error);
-        },
-        () => {
-          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-            resolve(downloadURL);
-          });
-        }
-      );
-    });
   };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -442,40 +515,76 @@ const AdminDashboard: React.FC = () => {
         {filteredWorkers.map(worker => (
           <div key={worker.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
             {editingId === worker.id ? (
-              // Edit Mode (Mobile Optimized)
-              <div className="space-y-4">
+              // Edit Mode (Expanded)
+              <div className="space-y-4 animate-fade-in">
                 <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                   <span className="text-sm font-bold text-brand-600 flex items-center gap-2">
-                    <i className="fas fa-pen-to-square"></i> 정보 수정
+                    <i className="fas fa-pen-to-square"></i> 정보 수정 (모든 정보)
                   </span>
                 </div>
                 
                 <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block">이름</label>
+                        <input
+                        type="text"
+                        name="name"
+                        value={editForm.name || ''}
+                        onChange={handleEditChange}
+                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:border-brand-500 outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block">연락처</label>
+                        <input
+                        type="tel"
+                        name="phone"
+                        value={editForm.phone || ''}
+                        onChange={handleEditChange}
+                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:border-brand-500 outline-none"
+                        />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">이름</label>
+                    <label className="text-xs text-gray-500 mb-1 block">주소 (텍스트)</label>
                     <input
                       type="text"
-                      name="name"
-                      value={editForm.name || ''}
+                      name="addressString"
+                      value={editForm.location?.addressString || ''}
                       onChange={handleEditChange}
-                      className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                      className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:border-brand-500 outline-none bg-gray-50"
+                      placeholder="주소 입력"
                     />
                   </div>
-                  
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">연락처</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={editForm.phone || ''}
-                      onChange={handleEditChange}
-                      className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
-                    />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block">은행명</label>
+                        <input
+                        type="text"
+                        name="bankName"
+                        value={editForm.bankName || ''}
+                        onChange={handleEditChange}
+                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:border-brand-500 outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block">계좌번호</label>
+                        <input
+                        type="text"
+                        name="accountNumber"
+                        value={editForm.accountNumber || ''}
+                        onChange={handleEditChange}
+                        className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:border-brand-500 outline-none"
+                        />
+                    </div>
                   </div>
 
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">희망 직종</label>
-                    <div className="flex flex-wrap gap-1.5 bg-gray-50 p-3 rounded-xl">
+                    <div className="flex flex-wrap gap-1.5 bg-gray-50 p-3 rounded-lg">
                       {JOB_TYPES_LIST.map(job => (
                         <button
                           key={job.value}
@@ -498,15 +607,33 @@ const AdminDashboard: React.FC = () => {
                       name="introduction"
                       value={editForm.introduction || ''}
                       onChange={handleEditChange}
-                      className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none resize-none"
+                      className="w-full p-2.5 border border-gray-200 rounded-lg text-sm outline-none resize-none"
                       rows={2}
                     />
                   </div>
+
+                  {/* Edit Files */}
+                   <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg">
+                       <div>
+                           <label className="text-xs text-gray-500 mb-1 block font-bold">신분증 (변경시)</label>
+                           <input type="file" accept="image/*" onChange={(e) => handleEditFileChange(e, 'idCard')} className="hidden" id={`editId_${worker.id}`} />
+                           <label htmlFor={`editId_${worker.id}`} className={`block w-full text-center py-2 border border-dashed rounded-lg text-xs cursor-pointer ${editFiles.idCard ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-gray-400'}`}>
+                               {editFiles.idCard ? '변경 파일 선택됨' : (editForm.idCardImageUrl ? '기존파일 유지' : '+ 등록')}
+                           </label>
+                       </div>
+                       <div>
+                           <label className="text-xs text-gray-500 mb-1 block font-bold">이수증 (변경시)</label>
+                           <input type="file" accept="image/*" onChange={(e) => handleEditFileChange(e, 'safetyCert')} className="hidden" id={`editSafe_${worker.id}`} />
+                           <label htmlFor={`editSafe_${worker.id}`} className={`block w-full text-center py-2 border border-dashed rounded-lg text-xs cursor-pointer ${editFiles.safetyCert ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-gray-400'}`}>
+                               {editFiles.safetyCert ? '변경 파일 선택됨' : (editForm.safetyCertImageUrl ? '기존파일 유지' : '+ 등록')}
+                           </label>
+                       </div>
+                   </div>
                 </div>
 
                 <div className="flex gap-2 pt-2">
                   <button onClick={cancelEdit} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl text-sm font-bold">취소</button>
-                  <button onClick={saveEdit} className="flex-1 bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-brand-200">저장하기</button>
+                  <button onClick={saveEdit} className="flex-1 bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-brand-200">수정 완료</button>
                 </div>
               </div>
             ) : (

@@ -57,10 +57,27 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          const data = docSnap.data() as WorkerProfile;
-          setFormData(data);
+          const data = docSnap.data() as Partial<WorkerProfile>;
+          // Ensure all fields are defined to avoid undefined errors later
+          setFormData({
+            name: data.name || '',
+            phone: data.phone || '',
+            bankName: data.bankName || '',
+            accountNumber: data.accountNumber || '',
+            desiredJobs: data.desiredJobs || [],
+            location: {
+              latitude: data.location?.latitude ?? null,
+              longitude: data.location?.longitude ?? null,
+              addressString: data.location?.addressString || ''
+            },
+            introduction: data.introduction || '',
+            idCardImageUrl: data.idCardImageUrl || '',
+            safetyCertImageUrl: data.safetyCertImageUrl || '',
+            isAgreed: !!data.isAgreed // coerce to boolean
+          });
+          
           if (data.isAgreed) {
-            // If already registered effectively, show submitted state or let them edit
+             // Optional: could auto-show submission state, but editing is better
           }
         }
       } catch (error) {
@@ -127,7 +144,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
             }
           }));
         } else {
-          // Fallback if status is not OK
           setFormData(prev => ({
             ...prev,
             location: {
@@ -149,6 +165,50 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
           addressString: `위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`
         }
       }));
+      setIsLoading(false);
+    }
+  };
+
+  // New function: Search address string to get coordinates
+  const searchAddress = async () => {
+    const addr = formData.location.addressString;
+    if (!addr) {
+      alert('주소를 입력해주세요.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const isReady = await waitForKakao();
+      if (!isReady) {
+        alert('지도 API를 로드하지 못했습니다.');
+        setIsLoading(false);
+        return;
+      }
+
+      const geocoder = new window.kakao.maps.services.Geocoder();
+      geocoder.addressSearch(addr, (result: any, status: any) => {
+        if (status === window.kakao.maps.services.Status.OK) {
+          const y = result[0].y;
+          const x = result[0].x;
+          const formattedAddress = result[0].address_name;
+
+          setFormData(prev => ({
+            ...prev,
+            location: {
+              latitude: parseFloat(y),
+              longitude: parseFloat(x),
+              addressString: formattedAddress
+            }
+          }));
+        } else {
+          alert('주소를 찾을 수 없습니다. 정확한 주소를 입력해주세요.');
+        }
+        setIsLoading(false);
+      });
+    } catch (error) {
+      console.error("Address search failed:", error);
+      alert('주소 검색 중 오류가 발생했습니다.');
       setIsLoading(false);
     }
   };
@@ -203,7 +263,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     setAiLoading(false);
   };
 
-  // Improved Upload Function using uploadBytesResumable
   const uploadImage = async (file: File, path: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       const storageRef = ref(storage, path);
@@ -211,7 +270,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
 
       uploadTask.on('state_changed',
         (snapshot) => {
-          // You can handle progress here if needed
+          // Progress monitoring if needed
         },
         (error) => {
           console.error("Upload error:", error);
@@ -235,35 +294,59 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     
     setIsLoading(true);
     try {
-      let idCardUrl = formData.idCardImageUrl;
-      let safetyCertUrl = formData.safetyCertImageUrl;
+      let idCardUrl = formData.idCardImageUrl || '';
+      let safetyCertUrl = formData.safetyCertImageUrl || '';
 
       // Upload ID Card if new file selected
       if (idCardFile) {
         setUploadStatus('신분증 업로드 중...');
-        idCardUrl = await uploadImage(idCardFile, `workers/${user.uid}/idCard_${Date.now()}`);
+        try {
+          idCardUrl = await uploadImage(idCardFile, `workers/${user.uid}/idCard_${Date.now()}`);
+        } catch (uploadError) {
+          console.error("ID Card upload failed", uploadError);
+          // Continue or halt? Let's halt for now or use empty
+          throw new Error("신분증 업로드에 실패했습니다.");
+        }
       }
 
       // Upload Safety Cert if new file selected
       if (safetyCertFile) {
         setUploadStatus('교육증 업로드 중...');
-        safetyCertUrl = await uploadImage(safetyCertFile, `workers/${user.uid}/safetyCert_${Date.now()}`);
+        try {
+          safetyCertUrl = await uploadImage(safetyCertFile, `workers/${user.uid}/safetyCert_${Date.now()}`);
+        } catch (uploadError) {
+          console.error("Safety Cert upload failed", uploadError);
+           throw new Error("이수증 업로드에 실패했습니다.");
+        }
       }
 
       setUploadStatus('정보 저장 중...');
       
-      // Save to Firestore
-      await setDoc(doc(db, "workers", user.uid), {
-        ...formData,
-        idCardImageUrl: idCardUrl,
-        safetyCertImageUrl: safetyCertUrl,
-        email: user.email,
-        updatedAt: new Date().toISOString()
-      });
+      // Sanitized data object ensuring NO undefined values
+      const dataToSave = {
+        name: formData.name || '',
+        phone: formData.phone || '',
+        bankName: formData.bankName || '',
+        accountNumber: formData.accountNumber || '',
+        desiredJobs: formData.desiredJobs || [],
+        location: {
+            latitude: formData.location.latitude ?? null,
+            longitude: formData.location.longitude ?? null,
+            addressString: formData.location.addressString || ''
+        },
+        introduction: formData.introduction || '',
+        idCardImageUrl: idCardUrl || '',
+        safetyCertImageUrl: safetyCertUrl || '',
+        email: user.email || '',
+        updatedAt: new Date().toISOString(),
+        isAgreed: true
+      };
+
+      await setDoc(doc(db, "workers", user.uid), dataToSave);
       setIsSubmitted(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error writing document: ", error);
-      alert("저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      alert(`저장 중 오류가 발생했습니다: ${error.message}`);
     } finally {
       setIsLoading(false);
       setUploadStatus('');
@@ -415,14 +498,24 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
                     name="addressString"
                     value={formData.location.addressString}
                     onChange={(e) => setFormData(prev => ({ ...prev, location: { ...prev.location, addressString: e.target.value }}))}
-                    className="flex-1 px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-sm"
-                    placeholder="위치 버튼을 누르거나 지도를 클릭하세요"
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), searchAddress())}
+                    className="flex-1 px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-sm focus:bg-white focus:border-brand-500 outline-none"
+                    placeholder="주소 입력 후 검색 버튼 클릭"
                   />
+                  <button
+                    type="button"
+                    onClick={searchAddress}
+                    disabled={isLoading}
+                    className="bg-brand-600 text-white px-3 rounded-lg hover:bg-brand-700 transition-colors text-sm font-bold whitespace-nowrap"
+                  >
+                    검색
+                  </button>
                   <button
                     type="button"
                     onClick={getLocation}
                     disabled={isLoading}
                     className="bg-slate-700 text-white px-4 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center min-w-[3rem]"
+                    aria-label="현위치 찾기"
                   >
                     {isLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-crosshairs"></i>}
                   </button>
