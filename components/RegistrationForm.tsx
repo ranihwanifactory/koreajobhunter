@@ -169,6 +169,30 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     }
   };
 
+  const getCoordsFromAddressHelper = async (addr: string): Promise<{lat: number, lng: number, addressName: string} | null> => {
+    try {
+      const isReady = await waitForKakao();
+      if (!isReady) return null;
+      return new Promise((resolve) => {
+          const geocoder = new window.kakao.maps.services.Geocoder();
+          geocoder.addressSearch(addr, (result: any, status: any) => {
+              if (status === window.kakao.maps.services.Status.OK) {
+                  resolve({
+                      lat: parseFloat(result[0].y),
+                      lng: parseFloat(result[0].x),
+                      addressName: result[0].address_name
+                  });
+              } else {
+                  resolve(null);
+              }
+          });
+      });
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
+
   // New function: Search address string to get coordinates
   const searchAddress = async () => {
     const addr = formData.location.addressString;
@@ -179,36 +203,23 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
 
     setIsLoading(true);
     try {
-      const isReady = await waitForKakao();
-      if (!isReady) {
-        alert('지도 API를 로드하지 못했습니다.');
-        setIsLoading(false);
-        return;
+      const result = await getCoordsFromAddressHelper(addr);
+      if (result) {
+        setFormData(prev => ({
+          ...prev,
+          location: {
+            latitude: result.lat,
+            longitude: result.lng,
+            addressString: result.addressName
+          }
+        }));
+      } else {
+        alert('주소를 찾을 수 없습니다. 정확한 주소를 입력해주세요.');
       }
-
-      const geocoder = new window.kakao.maps.services.Geocoder();
-      geocoder.addressSearch(addr, (result: any, status: any) => {
-        if (status === window.kakao.maps.services.Status.OK) {
-          const y = result[0].y;
-          const x = result[0].x;
-          const formattedAddress = result[0].address_name;
-
-          setFormData(prev => ({
-            ...prev,
-            location: {
-              latitude: parseFloat(y),
-              longitude: parseFloat(x),
-              addressString: formattedAddress
-            }
-          }));
-        } else {
-          alert('주소를 찾을 수 없습니다. 정확한 주소를 입력해주세요.');
-        }
-        setIsLoading(false);
-      });
     } catch (error) {
       console.error("Address search failed:", error);
       alert('주소 검색 중 오류가 발생했습니다.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -320,6 +331,26 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
         }
       }
 
+      setUploadStatus('위치 정보 확인 중...');
+      
+      // Auto-geocode logic if missing lat/lng
+      let finalLat = formData.location.latitude ?? null;
+      let finalLng = formData.location.longitude ?? null;
+      let finalAddr = formData.location.addressString || '';
+
+      if ((!finalLat || !finalLng) && finalAddr) {
+          try {
+             const coords = await getCoordsFromAddressHelper(finalAddr);
+             if (coords) {
+                 finalLat = coords.lat;
+                 finalLng = coords.lng;
+                 finalAddr = coords.addressName;
+             }
+          } catch(e) {
+              console.error("Auto geocode fail", e);
+          }
+      }
+
       setUploadStatus('정보 저장 중...');
       
       // Sanitized data object ensuring NO undefined values
@@ -330,9 +361,9 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
         accountNumber: formData.accountNumber || '',
         desiredJobs: formData.desiredJobs || [],
         location: {
-            latitude: formData.location.latitude ?? null,
-            longitude: formData.location.longitude ?? null,
-            addressString: formData.location.addressString || ''
+            latitude: finalLat,
+            longitude: finalLng,
+            addressString: finalAddr
         },
         introduction: formData.introduction || '',
         idCardImageUrl: idCardUrl || '',
@@ -343,6 +374,19 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
       };
 
       await setDoc(doc(db, "workers", user.uid), dataToSave);
+      
+      // Update local state to reflect possible geocode changes
+      setFormData(prev => ({
+          ...prev,
+          location: {
+              latitude: finalLat,
+              longitude: finalLng,
+              addressString: finalAddr
+          },
+          idCardImageUrl: idCardUrl,
+          safetyCertImageUrl: safetyCertUrl
+      }));
+
       setIsSubmitted(true);
     } catch (error: any) {
       console.error("Error writing document: ", error);

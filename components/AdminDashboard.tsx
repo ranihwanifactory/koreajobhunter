@@ -97,6 +97,72 @@ const AdminDashboard: React.FC = () => {
     });
   };
 
+  // --- Geocoding Helper ---
+  const waitForKakao = async (retries = 10): Promise<boolean> => {
+    if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
+      return true;
+    }
+    if (retries === 0) return false;
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return waitForKakao(retries - 1);
+  };
+
+  const getCoordsFromAddress = async (addr: string): Promise<{lat: number, lng: number, addressName: string} | null> => {
+      const isReady = await waitForKakao();
+      if (!isReady) return null;
+      return new Promise((resolve) => {
+          const geocoder = new window.kakao.maps.services.Geocoder();
+          geocoder.addressSearch(addr, (result: any, status: any) => {
+              if (status === window.kakao.maps.services.Status.OK) {
+                  resolve({
+                      lat: parseFloat(result[0].y),
+                      lng: parseFloat(result[0].x),
+                      addressName: result[0].address_name
+                  });
+              } else {
+                  resolve(null);
+              }
+          });
+      });
+  };
+
+  const handleSearchAddress = async (isEdit: boolean) => {
+      const targetAddr = isEdit ? editForm.location?.addressString : newWorker.location.addressString;
+      if (!targetAddr) {
+          alert('주소를 입력해주세요.');
+          return;
+      }
+
+      const result = await getCoordsFromAddress(targetAddr);
+      if (result) {
+          if (isEdit) {
+              setEditForm(prev => ({
+                  ...prev,
+                  location: {
+                      ...prev.location!,
+                      latitude: result.lat,
+                      longitude: result.lng,
+                      addressString: result.addressName
+                  }
+              }));
+          } else {
+              setNewWorker(prev => ({
+                  ...prev,
+                  location: {
+                      ...prev.location,
+                      latitude: result.lat,
+                      longitude: result.lng,
+                      addressString: result.addressName
+                  }
+              }));
+          }
+          alert(`위치 확인 완료: ${result.addressName}`);
+      } else {
+          alert('주소를 찾을 수 없습니다.');
+      }
+  };
+
+
   // --- Edit Logic ---
   const startEdit = (worker: WorkerProfile) => {
     setEditingId(worker.id!);
@@ -180,6 +246,20 @@ const AdminDashboard: React.FC = () => {
          safetyCertUrl = await uploadImageSafe(editFiles.safetyCert, `workers/${editingId}/safetyCert_${timestamp}`);
       }
 
+      // Geocode check if needed
+      let finalLat = editForm.location?.latitude ?? null;
+      let finalLng = editForm.location?.longitude ?? null;
+      let finalAddr = editForm.location?.addressString || '';
+
+      if ((!finalLat || !finalLng) && finalAddr) {
+          const coords = await getCoordsFromAddress(finalAddr);
+          if (coords) {
+              finalLat = coords.lat;
+              finalLng = coords.lng;
+              finalAddr = coords.addressName;
+          }
+      }
+
       // Safe string helper
       const safeStr = (val: string | undefined | null) => val || '';
 
@@ -191,7 +271,11 @@ const AdminDashboard: React.FC = () => {
           accountNumber: safeStr(editForm.accountNumber),
           introduction: safeStr(editForm.introduction),
           desiredJobs: editForm.desiredJobs || [],
-          location: editForm.location || { latitude: null, longitude: null, addressString: '' },
+          location: {
+              latitude: finalLat,
+              longitude: finalLng,
+              addressString: finalAddr
+          },
           idCardImageUrl: safeStr(idCardUrl),
           safetyCertImageUrl: safeStr(safetyCertUrl),
           updatedAt: new Date().toISOString()
@@ -268,9 +352,34 @@ const AdminDashboard: React.FC = () => {
             safetyCertUrl = await uploadImageSafe(newFiles.safetyCert, `${uploadPrefix}/safetyCert`);
         }
 
+        setUploadStatus('위치 확인 중...');
+        
+        // Geocode Check
+        let finalLat = newWorker.location.latitude;
+        let finalLng = newWorker.location.longitude;
+        let finalAddr = newWorker.location.addressString;
+
+        if ((!finalLat || !finalLng) && finalAddr) {
+            try {
+                const coords = await getCoordsFromAddress(finalAddr);
+                if (coords) {
+                    finalLat = coords.lat;
+                    finalLng = coords.lng;
+                    finalAddr = coords.addressName;
+                }
+            } catch (e) {
+                console.error("Auto geocode failed", e);
+            }
+        }
+
         setUploadStatus('정보 저장 중...');
         const workerData: WorkerProfile = {
             ...newWorker,
+            location: {
+                latitude: finalLat,
+                longitude: finalLng,
+                addressString: finalAddr
+            },
             idCardImageUrl: idCardUrl,
             safetyCertImageUrl: safetyCertUrl,
             updatedAt: new Date().toISOString(),
@@ -414,14 +523,30 @@ const AdminDashboard: React.FC = () => {
 
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">주소</label>
-                    <input
-                        type="text"
-                        name="addressString"
-                        value={newWorker.location.addressString}
-                        onChange={handleNewWorkerChange}
-                        className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
-                        placeholder="거주지 또는 희망 근무지"
-                    />
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            name="addressString"
+                            value={newWorker.location.addressString}
+                            onChange={handleNewWorkerChange}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearchAddress(false))}
+                            className="flex-1 p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                            placeholder="거주지 또는 희망 근무지"
+                        />
+                        <button 
+                            type="button" 
+                            onClick={() => handleSearchAddress(false)}
+                            className="bg-brand-600 text-white px-3 rounded-xl text-xs font-bold whitespace-nowrap"
+                        >
+                            검색
+                        </button>
+                    </div>
+                    {newWorker.location.latitude && (
+                        <p className="text-[10px] text-blue-500 mt-1 pl-1">
+                            <i className="fas fa-check-circle mr-1"></i>
+                            지도 위치 확인됨 ({newWorker.location.latitude.toFixed(4)}, {newWorker.location.longitude.toFixed(4)})
+                        </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -549,14 +674,30 @@ const AdminDashboard: React.FC = () => {
 
                   <div>
                     <label className="text-xs text-gray-500 mb-1 block">주소 (텍스트)</label>
-                    <input
-                      type="text"
-                      name="addressString"
-                      value={editForm.location?.addressString || ''}
-                      onChange={handleEditChange}
-                      className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:border-brand-500 outline-none bg-gray-50"
-                      placeholder="주소 입력"
-                    />
+                    <div className="flex gap-2">
+                        <input
+                        type="text"
+                        name="addressString"
+                        value={editForm.location?.addressString || ''}
+                        onChange={handleEditChange}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearchAddress(true))}
+                        className="flex-1 p-2.5 border border-gray-200 rounded-lg text-sm focus:border-brand-500 outline-none bg-gray-50"
+                        placeholder="주소 입력"
+                        />
+                        <button 
+                            type="button" 
+                            onClick={() => handleSearchAddress(true)}
+                            className="bg-brand-600 text-white px-3 rounded-lg text-xs font-bold whitespace-nowrap"
+                        >
+                            검색
+                        </button>
+                    </div>
+                    {editForm.location?.latitude && (
+                        <p className="text-[10px] text-blue-500 mt-1 pl-1">
+                            <i className="fas fa-check-circle mr-1"></i>
+                            지도 위치 확인됨
+                        </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
