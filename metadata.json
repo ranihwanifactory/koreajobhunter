@@ -1,0 +1,7 @@
+{
+  "name": "젊은인력 (Young Workforce)",
+  "description": "Smart manpower registration and management app for Young Workforce agency.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
