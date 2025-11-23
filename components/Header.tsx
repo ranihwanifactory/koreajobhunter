@@ -17,13 +17,37 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNoti, setShowNoti] = useState(false);
   const [hasNew, setHasNew] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const notiRef = useRef<HTMLDivElement>(null);
+
+  // Load dismissed notifications from local storage
+  useEffect(() => {
+    if (user) {
+      const key = `dismissed_notis_${user.uid}`;
+      try {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          setDismissedIds(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error("Failed to load dismissed notifications", e);
+      }
+    } else {
+      setDismissedIds([]);
+    }
+  }, [user]);
+
+  const saveDismissedIds = (ids: string[]) => {
+    if (!user) return;
+    setDismissedIds(ids);
+    localStorage.setItem(`dismissed_notis_${user.uid}`, JSON.stringify(ids));
+  };
 
   // 알림 가져오기
   useEffect(() => {
     if (!user) return;
 
-    const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(10));
+    const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(20));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppNotification));
       setNotifications(list);
@@ -52,12 +76,27 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const visibleNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
+
   const handleBellClick = () => {
     setShowNoti(!showNoti);
     if (!showNoti && notifications.length > 0) {
       setHasNew(false);
       localStorage.setItem('lastReadNotiTime', notifications[0].createdAt);
     }
+  };
+
+  const handleDeleteNoti = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const newIds = [...dismissedIds, id];
+    saveDismissedIds(newIds);
+  };
+
+  const handleClearAll = () => {
+    // 현재 로드된 모든 알림을 숨김 처리
+    const currentIds = notifications.map(n => n.id);
+    const uniqueIds = Array.from(new Set([...dismissedIds, ...currentIds]));
+    saveDismissedIds(uniqueIds);
   };
 
   const handleShare = async () => {
@@ -76,10 +115,6 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
     } else {
       alert('URL이 복사되었습니다: ' + window.location.href);
     }
-  };
-
-  const handleInstallInfo = () => {
-    alert('아이폰: 사파리 하단 공유 버튼 -> "홈 화면에 추가"\n안드로이드: 크롬 우측 상단 메뉴 -> "홈 화면에 추가" 또는 "앱 설치"');
   };
 
   const handleLogout = () => {
@@ -143,28 +178,42 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
               <div className="absolute top-12 right-0 w-80 bg-white shadow-xl rounded-xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
                 <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                   <h3 className="font-bold text-sm text-gray-800">알림 센터</h3>
-                  <span className="text-xs text-gray-500">최근 {notifications.length}개</span>
+                  <div className="flex items-center gap-3">
+                     <button 
+                        onClick={handleClearAll}
+                        className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                     >
+                        모두 지우기
+                     </button>
+                  </div>
                 </div>
                 <div className="max-h-80 overflow-y-auto">
-                  {notifications.length === 0 ? (
+                  {visibleNotifications.length === 0 ? (
                     <div className="p-6 text-center text-gray-500 text-sm">
                       새로운 알림이 없습니다.
                     </div>
                   ) : (
                     <ul className="divide-y divide-gray-100">
-                      {notifications.map((noti) => (
-                        <li key={noti.id} className="p-4 hover:bg-gray-50 transition-colors">
+                      {visibleNotifications.map((noti) => (
+                        <li key={noti.id} className="p-4 hover:bg-gray-50 transition-colors relative group">
                           <div className="flex items-start gap-3">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${noti.type === 'job' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
                               <i className={`fas ${noti.type === 'job' ? 'fa-briefcase' : 'fa-info-circle'} text-xs`}></i>
                             </div>
-                            <div>
+                            <div className="flex-1 pr-4">
                               <h4 className="text-sm font-bold text-gray-800 mb-1">{noti.title}</h4>
                               <p className="text-xs text-gray-600 leading-snug mb-1">{noti.message}</p>
                               <span className="text-[10px] text-gray-400">
                                 {new Date(noti.createdAt).toLocaleDateString()} {new Date(noti.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                               </span>
                             </div>
+                            <button 
+                                onClick={(e) => handleDeleteNoti(e, noti.id)}
+                                className="absolute top-3 right-3 text-gray-300 hover:text-red-500 p-1 transition-colors"
+                                aria-label="삭제"
+                            >
+                                <i className="fas fa-times text-sm"></i>
+                            </button>
                           </div>
                         </li>
                       ))}
