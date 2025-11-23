@@ -5,7 +5,8 @@ import { generateWorkerIntro } from '../services/geminiService';
 import { User } from 'firebase/auth';
 import { db, storage } from '../services/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import LocationPickerMap from './LocationPickerMap';
 
 interface RegistrationFormProps {
   user: User;
@@ -123,7 +124,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
                  }
                }));
              } else {
-               // Fallback if kakao fails
                setFormData(prev => ({
                  ...prev,
                  location: {
@@ -136,7 +136,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
              setIsLoading(false);
           });
         } else {
-          // Fallback if script not loaded
           setFormData(prev => ({
             ...prev,
             location: {
@@ -156,6 +155,18 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     );
   };
 
+  // Callback from LocationPickerMap
+  const handleMapLocationSelect = (lat: number, lng: number, address: string) => {
+    setFormData(prev => ({
+      ...prev,
+      location: {
+        latitude: lat,
+        longitude: lng,
+        addressString: address
+      }
+    }));
+  };
+
   const generateSmartIntro = async () => {
     if (!formData.name || formData.desiredJobs.length === 0) {
       alert('이름과 희망 직종을 먼저 선택해주세요.');
@@ -172,10 +183,27 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     setAiLoading(false);
   };
 
+  // Improved Upload Function using uploadBytesResumable
   const uploadImage = async (file: File, path: string): Promise<string> => {
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
+    return new Promise((resolve, reject) => {
+      const storageRef = ref(storage, path);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          // You can handle progress here if needed
+        },
+        (error) => {
+          console.error("Upload error:", error);
+          reject(error);
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            resolve(downloadURL);
+          });
+        }
+      );
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -215,7 +243,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
       setIsSubmitted(true);
     } catch (error) {
       console.error("Error writing document: ", error);
-      alert("저장 중 오류가 발생했습니다. 다시 시도해주세요.");
+      alert("저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
       setIsLoading(false);
       setUploadStatus('');
@@ -354,25 +382,32 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">현재 위치 (출근 가능 지역)</label>
-              <div className="flex gap-2">
-                 <input
-                  type="text"
-                  name="addressString"
-                  value={formData.location.addressString}
-                  onChange={(e) => setFormData(prev => ({ ...prev, location: { ...prev.location, addressString: e.target.value }}))}
-                  className="flex-1 px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-sm"
-                  placeholder="주소를 입력하거나 버튼을 누르세요"
+              <div className="space-y-3">
+                <LocationPickerMap 
+                  latitude={formData.location.latitude} 
+                  longitude={formData.location.longitude} 
+                  onLocationSelect={handleMapLocationSelect}
                 />
-                <button
-                  type="button"
-                  onClick={getLocation}
-                  disabled={isLoading}
-                  className="bg-slate-700 text-white px-4 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center min-w-[3rem]"
-                >
-                  {isLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-map-marker-alt"></i>}
-                </button>
+
+                <div className="flex gap-2">
+                   <input
+                    type="text"
+                    name="addressString"
+                    value={formData.location.addressString}
+                    onChange={(e) => setFormData(prev => ({ ...prev, location: { ...prev.location, addressString: e.target.value }}))}
+                    className="flex-1 px-4 py-3 rounded-lg border border-gray-200 bg-gray-50 text-sm"
+                    placeholder="위치 버튼을 누르거나 지도를 클릭하세요"
+                  />
+                  <button
+                    type="button"
+                    onClick={getLocation}
+                    disabled={isLoading}
+                    className="bg-slate-700 text-white px-4 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center min-w-[3rem]"
+                  >
+                    {isLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-crosshairs"></i>}
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 mt-1">* 위치 버튼을 누르면 자동으로 주소가 입력됩니다.</p>
             </div>
 
             <div className="flex gap-3 pt-4">

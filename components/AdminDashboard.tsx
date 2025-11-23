@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { db, storage } from '../services/firebase';
 import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { WorkerProfile, JobType } from '../types';
 import { JOB_TYPES_LIST } from '../constants';
 import WorkerMap from './WorkerMap';
@@ -148,6 +148,27 @@ const AdminDashboard: React.FC = () => {
       }
   };
 
+  // Safe upload function
+  const uploadImageSafe = async (file: File, path: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const storageRef = ref(storage, path);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed',
+        null,
+        (error) => {
+          console.error("Upload error:", error);
+          reject(error);
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            resolve(downloadURL);
+          });
+        }
+      );
+    });
+  };
+
   const handleAddSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newWorker.name || !newWorker.phone) {
@@ -165,34 +186,18 @@ const AdminDashboard: React.FC = () => {
         // Upload ID Card
         if (newFiles.idCard) {
             setUploadStatus('신분증 업로드 중...');
-            const storageRef = ref(storage, `${uploadPrefix}/idCard`);
-            await uploadBytes(storageRef, newFiles.idCard);
-            idCardUrl = await getDownloadURL(storageRef);
+            idCardUrl = await uploadImageSafe(newFiles.idCard, `${uploadPrefix}/idCard`);
         }
 
         // Upload Safety Cert
         if (newFiles.safetyCert) {
             setUploadStatus('이수증 업로드 중...');
-            const storageRef = ref(storage, `${uploadPrefix}/safetyCert`);
-            await uploadBytes(storageRef, newFiles.safetyCert);
-            safetyCertUrl = await getDownloadURL(storageRef);
+            safetyCertUrl = await uploadImageSafe(newFiles.safetyCert, `${uploadPrefix}/safetyCert`);
         }
-
-        // Geocoding for manual entry (Basic Attempt)
-        let lat = null;
-        let lng = null;
-        // In a real app, we would use Kakao Geocoder here too if address is provided, 
-        // but for now we focus on the main registration flow for geocoding to keep manual entry simple or add later.
-        // We will just leave lat/lng null for manual entries unless we add a geocoder call here.
 
         setUploadStatus('정보 저장 중...');
         const workerData: WorkerProfile = {
             ...newWorker,
-            location: {
-                ...newWorker.location,
-                latitude: lat,
-                longitude: lng
-            },
             idCardImageUrl: idCardUrl,
             safetyCertImageUrl: safetyCertUrl,
             updatedAt: new Date().toISOString(),
@@ -212,7 +217,11 @@ const AdminDashboard: React.FC = () => {
             bankName: '',
             accountNumber: '',
             desiredJobs: [],
-            location: { latitude: null, longitude: null, addressString: '' },
+            location: {
+              latitude: null,
+              longitude: null,
+              addressString: ''
+            },
             introduction: '',
             isAgreed: true,
             idCardImageUrl: '',

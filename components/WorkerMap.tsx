@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { WorkerProfile } from '../types';
 
 interface WorkerMapProps {
@@ -13,15 +13,23 @@ declare global {
 
 const WorkerMap: React.FC<WorkerMapProps> = ({ workers }) => {
   const mapRef = useRef<HTMLDivElement>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
   useEffect(() => {
-    if (!window.kakao || !mapRef.current) return;
+    const checkKakao = () => {
+      if (window.kakao && window.kakao.maps) {
+        loadMap();
+      } else {
+        setTimeout(checkKakao, 100);
+      }
+    };
 
-    const { kakao } = window;
+    const loadMap = () => {
+      if (!mapRef.current) return;
 
-    kakao.maps.load(() => {
+      const { kakao } = window;
       const container = mapRef.current;
-      // Default center: Seongju-gun Office or average of workers
+      // Default center: Seongju-gun Office
       const defaultCenter = new kakao.maps.LatLng(35.919, 128.286); 
       
       const options = {
@@ -50,7 +58,7 @@ const WorkerMap: React.FC<WorkerMapProps> = ({ workers }) => {
 
           // InfoWindow
           const content = `
-            <div style="padding:5px; font-size:12px; border-radius:4px; background:white; border:1px solid #ddd; min-width:120px;">
+            <div style="padding:5px; font-size:12px; border-radius:4px; background:white; border:1px solid #ddd; min-width:120px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
               <div style="font-weight:bold; color:#333; margin-bottom:2px;">${worker.name}</div>
               <div style="color:#666;">${worker.desiredJobs?.[0] || '직종미정'}</div>
             </div>
@@ -69,11 +77,21 @@ const WorkerMap: React.FC<WorkerMapProps> = ({ workers }) => {
       if (hasMarkers) {
         map.setBounds(bounds);
       }
-    });
+      
+      setIsMapLoaded(true);
+    };
+
+    checkKakao();
   }, [workers]);
 
   return (
     <div className="w-full h-64 bg-gray-200 rounded-xl overflow-hidden mb-6 shadow-sm border border-gray-200 relative">
+      {!isMapLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+          <i className="fas fa-circle-notch fa-spin text-gray-400 mr-2"></i>
+          <span className="text-gray-500 text-sm">지도 로딩 중...</span>
+        </div>
+      )}
       <div ref={mapRef} className="w-full h-full"></div>
       <div className="absolute bottom-2 right-2 z-10 bg-white/90 px-2 py-1 rounded text-xs text-gray-500 shadow-sm pointer-events-none">
         Powered by Kakao
