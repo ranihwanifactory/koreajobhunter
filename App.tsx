@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -5,6 +6,7 @@ import RegistrationForm from './components/RegistrationForm';
 import HeroSection from './components/HeroSection';
 import Auth from './components/Auth';
 import AdminDashboard from './components/AdminDashboard';
+import JobBoard from './components/JobBoard';
 import { BUSINESS_INFO, ADMIN_EMAIL } from './constants';
 import { auth } from './services/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -68,6 +70,9 @@ function App() {
           <>
             <HeroSection />
             
+            {/* New Job Board Section */}
+            <JobBoard />
+
             <div className="mb-6">
               <h3 className="text-lg font-bold text-gray-800 mb-4 px-1">
                 <i className="fas fa-user-plus mr-2 text-brand-600"></i>

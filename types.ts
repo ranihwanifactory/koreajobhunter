@@ -1,3 +1,4 @@
+
 export enum JobType {
   CONSTRUCTION = '건설/현장',
   AGRICULTURE = '농촌/농업',
@@ -36,4 +37,16 @@ export interface BusinessInfo {
   phone: string;
   address: string;
   bizNumber: string;
+}
+
+export interface JobPosting {
+  id?: string;
+  companyName: string;    // 업체명
+  address: string;        // 현장 주소
+  content: string;        // 업무 내용 (간단 설명)
+  pay: string;            // 일당/급여
+  date: string;           // 날짜/기간
+  contact: string;        // 연락처
+  isUrgent?: boolean;     // 긴급 여부
+  createdAt: string;
 }
