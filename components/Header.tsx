@@ -127,10 +127,12 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100">
       <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">
-            젊
-          </div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">{BUSINESS_INFO.name}</h1>
+          {/* Logo & Home Link */}
+          <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <img src="/logo.png" alt="Logo" className="h-9 w-auto object-contain" />
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">{BUSINESS_INFO.name}</h1>
+          </a>
+          
           {isAdmin && (
              <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full font-bold border border-red-200">
                관리자
