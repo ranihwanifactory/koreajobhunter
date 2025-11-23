@@ -23,6 +23,11 @@ export interface WorkerProfile {
     addressString: string;
   };
   introduction: string;
+  
+  // Image URLs
+  idCardImageUrl?: string;
+  safetyCertImageUrl?: string;
+  
   isAgreed: boolean;
 }
 

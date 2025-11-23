@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { db } from '../services/firebase';
-import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { db, storage } from '../services/firebase';
+import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { WorkerProfile, JobType } from '../types';
 import { JOB_TYPES_LIST } from '../constants';
+import WorkerMap from './WorkerMap';
 
 const AdminDashboard: React.FC = () => {
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
@@ -10,6 +12,27 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<WorkerProfile>>({});
+
+  // States for Admin Registration
+  const [isAdding, setIsAdding] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [newFiles, setNewFiles] = useState<{idCard?: File, safetyCert?: File}>({});
+  const [newWorker, setNewWorker] = useState<WorkerProfile>({
+    name: '',
+    phone: '',
+    bankName: '',
+    accountNumber: '',
+    desiredJobs: [],
+    location: {
+      latitude: null,
+      longitude: null,
+      addressString: ''
+    },
+    introduction: '',
+    isAgreed: true, // Admin registered implies consent
+    idCardImageUrl: '',
+    safetyCertImageUrl: ''
+  });
 
   useEffect(() => {
     fetchWorkers();
@@ -51,9 +74,11 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  // --- Edit Logic ---
   const startEdit = (worker: WorkerProfile) => {
     setEditingId(worker.id!);
     setEditForm({ ...worker });
+    setIsAdding(false); // Close add form if open
   };
 
   const cancelEdit = () => {
@@ -84,7 +109,7 @@ const AdminDashboard: React.FC = () => {
       const workerRef = doc(db, 'workers', editingId);
       await updateDoc(workerRef, {
         ...editForm,
-        updatedAt: new Date().toISOString() // Update timestamp
+        updatedAt: new Date().toISOString()
       });
       
       setWorkers(prev => prev.map(w => w.id === editingId ? { ...w, ...editForm, updatedAt: new Date().toISOString() } as WorkerProfile : w));
@@ -95,6 +120,115 @@ const AdminDashboard: React.FC = () => {
       alert('수정 실패');
     }
   };
+
+  // --- Add (Manual Register) Logic ---
+  const handleNewWorkerChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    if (name === 'addressString') {
+        setNewWorker(prev => ({ ...prev, location: { ...prev.location, addressString: value } }));
+    } else {
+        setNewWorker(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const toggleNewJob = (jobValue: JobType) => {
+    setNewWorker(prev => {
+      const currentJobs = prev.desiredJobs;
+      if (currentJobs.includes(jobValue)) {
+        return { ...prev, desiredJobs: currentJobs.filter(j => j !== jobValue) };
+      } else {
+        return { ...prev, desiredJobs: [...currentJobs, jobValue] };
+      }
+    });
+  };
+
+  const handleNewFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'idCard' | 'safetyCert') => {
+      if (e.target.files && e.target.files[0]) {
+          setNewFiles(prev => ({...prev, [type]: e.target.files![0]}));
+      }
+  };
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newWorker.name || !newWorker.phone) {
+          alert('이름과 연락처는 필수입니다.');
+          return;
+      }
+
+      setUploadStatus('등록 중...');
+      try {
+        let idCardUrl = '';
+        let safetyCertUrl = '';
+        const timestamp = Date.now();
+        const uploadPrefix = `workers/admin_upload_${timestamp}`;
+
+        // Upload ID Card
+        if (newFiles.idCard) {
+            setUploadStatus('신분증 업로드 중...');
+            const storageRef = ref(storage, `${uploadPrefix}/idCard`);
+            await uploadBytes(storageRef, newFiles.idCard);
+            idCardUrl = await getDownloadURL(storageRef);
+        }
+
+        // Upload Safety Cert
+        if (newFiles.safetyCert) {
+            setUploadStatus('이수증 업로드 중...');
+            const storageRef = ref(storage, `${uploadPrefix}/safetyCert`);
+            await uploadBytes(storageRef, newFiles.safetyCert);
+            safetyCertUrl = await getDownloadURL(storageRef);
+        }
+
+        // Geocoding for manual entry (Basic Attempt)
+        let lat = null;
+        let lng = null;
+        // In a real app, we would use Kakao Geocoder here too if address is provided, 
+        // but for now we focus on the main registration flow for geocoding to keep manual entry simple or add later.
+        // We will just leave lat/lng null for manual entries unless we add a geocoder call here.
+
+        setUploadStatus('정보 저장 중...');
+        const workerData: WorkerProfile = {
+            ...newWorker,
+            location: {
+                ...newWorker.location,
+                latitude: lat,
+                longitude: lng
+            },
+            idCardImageUrl: idCardUrl,
+            safetyCertImageUrl: safetyCertUrl,
+            updatedAt: new Date().toISOString(),
+            isAgreed: true
+        };
+
+        const docRef = await addDoc(collection(db, 'workers'), workerData);
+        
+        // Update local list
+        setWorkers(prev => [{ ...workerData, id: docRef.id }, ...prev]);
+        
+        // Reset
+        setIsAdding(false);
+        setNewWorker({
+            name: '',
+            phone: '',
+            bankName: '',
+            accountNumber: '',
+            desiredJobs: [],
+            location: { latitude: null, longitude: null, addressString: '' },
+            introduction: '',
+            isAgreed: true,
+            idCardImageUrl: '',
+            safetyCertImageUrl: ''
+        });
+        setNewFiles({});
+        alert('성공적으로 등록되었습니다.');
+
+      } catch (err) {
+          console.error(err);
+          alert('등록 중 오류가 발생했습니다.');
+      } finally {
+          setUploadStatus('');
+      }
+  };
+
 
   const filteredWorkers = workers.filter(worker => 
     worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -125,12 +259,22 @@ const AdminDashboard: React.FC = () => {
                 {workers.length}명
               </span>
             </h2>
-            <button 
-              onClick={fetchWorkers} 
-              className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
-            >
-              <i className="fas fa-sync-alt text-sm"></i>
-            </button>
+            <div className="flex gap-2">
+                <button
+                    onClick={() => setIsAdding(!isAdding)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                        isAdding ? 'bg-slate-800 text-white' : 'bg-brand-600 text-white hover:bg-brand-700'
+                    }`}
+                >
+                    {isAdding ? '닫기' : '+ 직접등록'}
+                </button>
+                <button 
+                onClick={fetchWorkers} 
+                className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                >
+                <i className="fas fa-sync-alt text-sm"></i>
+                </button>
+            </div>
           </div>
           
           <div className="relative w-full">
@@ -145,6 +289,144 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Map View */}
+      <div className="animate-fade-in">
+        <h3 className="text-sm font-bold text-gray-500 mb-2 ml-1">인력 분포 지도</h3>
+        <WorkerMap workers={workers} />
+      </div>
+
+      {/* Manual Registration Form */}
+      {isAdding && (
+          <div className="bg-white border-2 border-brand-100 rounded-2xl p-5 shadow-lg animate-fade-in-up">
+              <h3 className="font-bold text-lg text-brand-800 mb-4 flex items-center gap-2">
+                  <i className="fas fa-user-plus"></i> 인력 직접 등록
+              </h3>
+              <form onSubmit={handleAddSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block">이름 *</label>
+                        <input
+                            type="text"
+                            name="name"
+                            required
+                            value={newWorker.name}
+                            onChange={handleNewWorkerChange}
+                            className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                            placeholder="이름 입력"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block">연락처 *</label>
+                        <input
+                            type="tel"
+                            name="phone"
+                            required
+                            value={newWorker.phone}
+                            onChange={handleNewWorkerChange}
+                            className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                            placeholder="010-xxxx-xxxx"
+                        />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">주소</label>
+                    <input
+                        type="text"
+                        name="addressString"
+                        value={newWorker.location.addressString}
+                        onChange={handleNewWorkerChange}
+                        className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                        placeholder="거주지 또는 희망 근무지"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block">은행명</label>
+                        <input
+                            type="text"
+                            name="bankName"
+                            value={newWorker.bankName}
+                            onChange={handleNewWorkerChange}
+                            className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                            placeholder="예: 농협"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block">계좌번호</label>
+                        <input
+                            type="text"
+                            name="accountNumber"
+                            value={newWorker.accountNumber}
+                            onChange={handleNewWorkerChange}
+                            className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                            placeholder="계좌번호 입력"
+                        />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">희망 직종</label>
+                    <div className="flex flex-wrap gap-1.5 bg-gray-50 p-3 rounded-xl">
+                      {JOB_TYPES_LIST.map(job => (
+                        <button
+                          key={job.value}
+                          type="button"
+                          onClick={() => toggleNewJob(job.value)}
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
+                            newWorker.desiredJobs.includes(job.value)
+                            ? 'bg-brand-500 text-white border-brand-500 shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-200'
+                          }`}
+                        >
+                          {job.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">소개글</label>
+                    <textarea
+                        name="introduction"
+                        value={newWorker.introduction}
+                        onChange={handleNewWorkerChange}
+                        className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none resize-none"
+                        rows={2}
+                        placeholder="특이사항이나 간단한 소개"
+                    />
+                  </div>
+
+                  {/* File Uploads for Admin */}
+                   <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-xl">
+                       <div>
+                           <label className="text-xs text-gray-500 mb-1 block font-bold">신분증</label>
+                           <input type="file" accept="image/*" onChange={(e) => handleNewFileChange(e, 'idCard')} className="hidden" id="adminIdUpload" />
+                           <label htmlFor="adminIdUpload" className={`block w-full text-center py-2 border border-dashed rounded-lg text-xs cursor-pointer ${newFiles.idCard ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-gray-400'}`}>
+                               {newFiles.idCard ? '선택됨' : '+ 사진추가'}
+                           </label>
+                       </div>
+                       <div>
+                           <label className="text-xs text-gray-500 mb-1 block font-bold">이수증</label>
+                           <input type="file" accept="image/*" onChange={(e) => handleNewFileChange(e, 'safetyCert')} className="hidden" id="adminSafeUpload" />
+                           <label htmlFor="adminSafeUpload" className={`block w-full text-center py-2 border border-dashed rounded-lg text-xs cursor-pointer ${newFiles.safetyCert ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-gray-400'}`}>
+                               {newFiles.safetyCert ? '선택됨' : '+ 사진추가'}
+                           </label>
+                       </div>
+                   </div>
+
+                  <button
+                    type="submit"
+                    disabled={!!uploadStatus}
+                    className="w-full bg-brand-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-brand-200 hover:bg-brand-700 transition-all active:scale-95 mt-2"
+                  >
+                      {uploadStatus ? <><i className="fas fa-spinner fa-spin mr-2"></i>{uploadStatus}</> : '등록하기'}
+                  </button>
+              </form>
+          </div>
+      )}
 
       {/* Workers List */}
       <div className="grid grid-cols-1 gap-4">
@@ -285,8 +567,35 @@ const AdminDashboard: React.FC = () => {
                         : <span className="text-gray-400 font-sans">계좌 정보 없음</span>}
                     </div>
                   </div>
+                  
+                  {/* Image Links */}
+                  {(worker.idCardImageUrl || worker.safetyCertImageUrl) && (
+                    <div className="flex gap-2 pt-2 mt-2 border-t border-gray-200">
+                      {worker.idCardImageUrl && (
+                        <a 
+                          href={worker.idCardImageUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100 transition-colors"
+                        >
+                          <i className="fas fa-id-card"></i> 신분증 확인
+                        </a>
+                      )}
+                      {worker.safetyCertImageUrl && (
+                        <a 
+                          href={worker.safetyCertImageUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-teal-50 text-teal-600 rounded-lg text-xs font-medium hover:bg-teal-100 transition-colors"
+                        >
+                          <i className="fas fa-hard-hat"></i> 이수증 확인
+                        </a>
+                      )}
+                    </div>
+                  )}
+
                    {worker.introduction && (
-                    <div className="flex items-start gap-2 text-sm pt-1 border-t border-gray-200 mt-2">
+                    <div className="flex items-start gap-2 text-sm pt-2 mt-2 border-t border-gray-200">
                       <i className="fas fa-quote-left mt-1 w-4 text-center text-brand-300"></i>
                       <div className="flex-1 text-gray-600 italic text-xs leading-relaxed">
                         {worker.introduction}

@@ -5,8 +5,11 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>젊은인력 - 인력 등록 및 관리</title>
+    <link rel="manifest" href="./manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Kakao Maps SDK -->
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=9bd957a95b1d9c9c2e8b95bbaf294dc1&libraries=services"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -64,6 +67,7 @@
     "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+    "firebase/storage": "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js",
     "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/"
   }
 }
@@ -72,6 +76,18 @@
 </head>
   <body>
     <div id="root"></div>
+    <script>
+      // PWA Install Prompt Logic
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // Show install button or hint if needed globally
+        // For this app, we rely on the Header button, but we can try to prompt if user interacts
+      });
+
+      // Try to auto-install (Browsers often block this without interaction, but we can try via logic in App)
+    </script>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>
