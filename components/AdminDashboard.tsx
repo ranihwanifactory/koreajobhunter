@@ -111,68 +111,87 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-          <h2 className="text-xl font-bold text-gray-800">
-            <i className="fas fa-users-cog mr-2 text-brand-600"></i>
-            인력 관리 ({workers.length}명)
-          </h2>
-          <div className="flex gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <input
-                type="text"
-                placeholder="이름, 연락처 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-brand-500"
-              />
-              <i className="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-            </div>
+    <div className="space-y-4 pb-20">
+      {/* Header & Search */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 sticky top-16 z-30">
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center">
+              <span className="w-8 h-8 bg-brand-100 text-brand-600 rounded-lg flex items-center justify-center mr-2 text-sm">
+                <i className="fas fa-users-cog"></i>
+              </span>
+              인력 관리 
+              <span className="ml-2 text-sm font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                {workers.length}명
+              </span>
+            </h2>
             <button 
               onClick={fetchWorkers} 
-              className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+              className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
             >
-              <i className="fas fa-sync-alt"></i>
+              <i className="fas fa-sync-alt text-sm"></i>
             </button>
           </div>
+          
+          <div className="relative w-full">
+            <input
+              type="text"
+              placeholder="이름 또는 전화번호 검색..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 transition-all text-sm"
+            />
+            <i className="fas fa-search absolute left-3.5 top-3.5 text-gray-400"></i>
+          </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredWorkers.map(worker => (
-            <div key={worker.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-              {editingId === worker.id ? (
-                // Edit Mode
+      {/* Workers List */}
+      <div className="grid grid-cols-1 gap-4">
+        {filteredWorkers.map(worker => (
+          <div key={worker.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+            {editingId === worker.id ? (
+              // Edit Mode (Mobile Optimized)
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                  <span className="text-sm font-bold text-brand-600 flex items-center gap-2">
+                    <i className="fas fa-pen-to-square"></i> 정보 수정
+                  </span>
+                </div>
+                
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-bold text-brand-600">정보 수정 중</span>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">이름</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={editForm.name || ''}
+                      onChange={handleEditChange}
+                      className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    name="name"
-                    value={editForm.name || ''}
-                    onChange={handleEditChange}
-                    className="w-full p-2 border rounded text-sm"
-                    placeholder="이름"
-                  />
-                  <input
-                    type="text"
-                    name="phone"
-                    value={editForm.phone || ''}
-                    onChange={handleEditChange}
-                    className="w-full p-2 border rounded text-sm"
-                    placeholder="연락처"
-                  />
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500">희망 직종</p>
-                    <div className="flex flex-wrap gap-1">
+                  
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">연락처</label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={editForm.phone || ''}
+                      onChange={handleEditChange}
+                      className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:border-brand-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">희망 직종</label>
+                    <div className="flex flex-wrap gap-1.5 bg-gray-50 p-3 rounded-xl">
                       {JOB_TYPES_LIST.map(job => (
                         <button
                           key={job.value}
                           onClick={() => toggleEditJob(job.value)}
-                          className={`text-xs px-2 py-1 rounded border ${
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
                             editForm.desiredJobs?.includes(job.value)
-                            ? 'bg-brand-500 text-white border-brand-500'
+                            ? 'bg-brand-500 text-white border-brand-500 shadow-sm'
                             : 'bg-white text-gray-600 border-gray-200'
                           }`}
                         >
@@ -181,101 +200,123 @@ const AdminDashboard: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                   <textarea
-                    name="introduction"
-                    value={editForm.introduction || ''}
-                    onChange={handleEditChange}
-                    className="w-full p-2 border rounded text-sm"
-                    rows={2}
-                    placeholder="소개"
-                  />
-                  <div className="flex gap-2 pt-2">
-                    <button onClick={saveEdit} className="flex-1 bg-brand-600 text-white py-2 rounded-lg text-sm font-bold">저장</button>
-                    <button onClick={cancelEdit} className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg text-sm">취소</button>
+
+                  <div>
+                     <label className="text-xs text-gray-500 mb-1 block">소개글</label>
+                     <textarea
+                      name="introduction"
+                      value={editForm.introduction || ''}
+                      onChange={handleEditChange}
+                      className="w-full p-3 border border-gray-200 rounded-xl text-sm outline-none resize-none"
+                      rows={2}
+                    />
                   </div>
                 </div>
-              ) : (
-                // View Mode
-                <>
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                        {worker.name}
-                        {worker.updatedAt && (
-                          <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded border border-green-100">
-                             {new Date(worker.updatedAt).toLocaleDateString()}
-                          </span>
-                        )}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        <i className="fas fa-phone-alt w-4 text-gray-400"></i>
-                        <a href={`tel:${worker.phone}`} className="hover:text-brand-600">{worker.phone}</a>
-                      </p>
+
+                <div className="flex gap-2 pt-2">
+                  <button onClick={cancelEdit} className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl text-sm font-bold">취소</button>
+                  <button onClick={saveEdit} className="flex-1 bg-brand-600 text-white py-3 rounded-xl text-sm font-bold shadow-md shadow-brand-200">저장하기</button>
+                </div>
+              </div>
+            ) : (
+              // View Mode (Mobile Optimized)
+              <>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-lg text-gray-900">{worker.name}</h3>
+                      {worker.updatedAt && (
+                        <span className="text-[10px] text-gray-400 font-normal">
+                          {new Date(worker.updatedAt).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
-                    <div className="flex gap-1">
-                      <button 
-                        onClick={() => startEdit(worker)}
-                        className="w-8 h-8 rounded-full bg-gray-50 text-brand-600 hover:bg-brand-50 flex items-center justify-center transition-colors"
-                      >
-                        <i className="fas fa-pen text-xs"></i>
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(worker.id!, worker.name)}
-                        className="w-8 h-8 rounded-full bg-gray-50 text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
-                      >
-                        <i className="fas fa-trash text-xs"></i>
-                      </button>
+                    <div className="text-sm font-medium text-gray-600">
+                      {worker.phone}
                     </div>
                   </div>
+                  
+                  <div className="flex gap-2">
+                     <button 
+                      onClick={() => startEdit(worker)}
+                      className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-colors"
+                      aria-label="수정"
+                    >
+                      <i className="fas fa-pen text-xs"></i>
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(worker.id!, worker.name)}
+                      className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"
+                      aria-label="삭제"
+                    >
+                      <i className="fas fa-trash text-xs"></i>
+                    </button>
+                  </div>
+                </div>
 
-                  <div className="space-y-3 text-sm">
-                    <div className="bg-gray-50 p-2 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">희망 직종</p>
-                      <div className="flex flex-wrap gap-1">
-                        {worker.desiredJobs && worker.desiredJobs.length > 0 ? (
-                          worker.desiredJobs.map((job, idx) => (
-                            <span key={idx} className="px-2 py-0.5 bg-white border border-gray-200 rounded text-xs text-gray-700">
-                              {job}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-gray-400 text-xs">선택 안함</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs text-gray-500">계좌 정보</p>
-                      <p className="font-medium text-gray-700">
-                        {worker.bankName} {worker.accountNumber}
-                      </p>
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                       <p className="text-xs text-gray-500">위치</p>
-                       <p className="text-gray-700 truncate" title={worker.location.addressString}>
-                         {worker.location.addressString || '위치 정보 없음'}
-                       </p>
-                    </div>
-
-                    {worker.introduction && (
-                      <div className="mt-2 pt-2 border-t border-gray-100">
-                        <p className="text-gray-600 italic text-xs">"{worker.introduction}"</p>
-                      </div>
+                {/* Job Tags */}
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {worker.desiredJobs && worker.desiredJobs.length > 0 ? (
+                      worker.desiredJobs.map((job, idx) => (
+                        <span key={idx} className="px-2.5 py-1 bg-brand-50 text-brand-700 border border-brand-100 rounded-lg text-xs font-medium">
+                          {job}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-400 text-xs bg-gray-50 px-2 py-1 rounded">직종 미선택</span>
                     )}
                   </div>
-                </>
-              )}
-            </div>
-          ))}
+                </div>
 
-          {filteredWorkers.length === 0 && (
-            <div className="col-span-full text-center py-10 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-              <i className="fas fa-search text-3xl mb-3 opacity-50"></i>
-              <p>검색 결과가 없습니다.</p>
+                {/* Info Grid */}
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2 mb-4">
+                  <div className="flex items-start gap-2 text-sm">
+                    <i className="fas fa-map-marker-alt mt-1 w-4 text-center text-gray-400"></i>
+                    <div className="flex-1 text-gray-700 break-keep">
+                      {worker.location.addressString || <span className="text-gray-400">위치 정보 없음</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm">
+                    <i className="fas fa-university mt-1 w-4 text-center text-gray-400"></i>
+                    <div className="flex-1 text-gray-700 font-mono text-xs pt-0.5">
+                      {worker.bankName && worker.accountNumber 
+                        ? `${worker.bankName} ${worker.accountNumber}` 
+                        : <span className="text-gray-400 font-sans">계좌 정보 없음</span>}
+                    </div>
+                  </div>
+                   {worker.introduction && (
+                    <div className="flex items-start gap-2 text-sm pt-1 border-t border-gray-200 mt-2">
+                      <i className="fas fa-quote-left mt-1 w-4 text-center text-brand-300"></i>
+                      <div className="flex-1 text-gray-600 italic text-xs leading-relaxed">
+                        {worker.introduction}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Bar - Primary Call Button */}
+                <a
+                  href={`tel:${worker.phone}`}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-green-100 active:scale-[0.98] transition-all"
+                >
+                  <i className="fas fa-phone-alt animate-pulse"></i>
+                  전화걸기
+                </a>
+              </>
+            )}
+          </div>
+        ))}
+
+        {filteredWorkers.length === 0 && (
+          <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
+            <div className="w-16 h-16 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fas fa-search text-2xl"></i>
             </div>
-          )}
-        </div>
+            <p className="text-gray-500 font-medium">검색된 인력이 없습니다.</p>
+            <p className="text-sm text-gray-400 mt-1">다른 검색어를 입력해보세요.</p>
+          </div>
+        )}
       </div>
     </div>
   );
