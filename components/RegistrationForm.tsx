@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { WorkerProfile, JobType } from '../types';
 import { JOB_TYPES_LIST, BUSINESS_INFO } from '../constants';
@@ -96,6 +97,62 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     });
   };
 
+  // Helper to wait for Kakao API
+  const waitForKakao = async (retries = 10): Promise<boolean> => {
+    if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
+      return true;
+    }
+    if (retries === 0) return false;
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return waitForKakao(retries - 1);
+  };
+
+  const getAddressFromCoords = async (lat: number, lon: number) => {
+    try {
+      const isReady = await waitForKakao();
+      if (!isReady) {
+        throw new Error("Kakao Maps API not loaded");
+      }
+
+      const geocoder = new window.kakao.maps.services.Geocoder();
+      geocoder.coord2Address(lon, lat, (result: any, status: any) => {
+        if (status === window.kakao.maps.services.Status.OK) {
+          const detailAddr = result[0].address.address_name;
+          setFormData(prev => ({
+            ...prev,
+            location: {
+              latitude: lat,
+              longitude: lon,
+              addressString: detailAddr
+            }
+          }));
+        } else {
+          // Fallback if status is not OK
+          setFormData(prev => ({
+            ...prev,
+            location: {
+              latitude: lat,
+              longitude: lon,
+              addressString: `위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`
+            }
+          }));
+        }
+        setIsLoading(false);
+      });
+    } catch (error) {
+      console.error("Geocoding failed:", error);
+      setFormData(prev => ({
+        ...prev,
+        location: {
+          latitude: lat,
+          longitude: lon,
+          addressString: `위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`
+        }
+      }));
+      setIsLoading(false);
+    }
+  };
+
   const getLocation = () => {
     setIsLoading(true);
     if (!navigator.geolocation) {
@@ -108,50 +165,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
       (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-
-        // Use Kakao Geocoder to get address
-        if (window.kakao && window.kakao.maps && window.kakao.maps.services) {
-          const geocoder = new window.kakao.maps.services.Geocoder();
-          geocoder.coord2Address(lon, lat, (result: any, status: any) => {
-             if (status === window.kakao.maps.services.Status.OK) {
-               const detailAddr = result[0].address.address_name;
-               setFormData(prev => ({
-                 ...prev,
-                 location: {
-                   latitude: lat,
-                   longitude: lon,
-                   addressString: detailAddr
-                 }
-               }));
-             } else {
-               setFormData(prev => ({
-                 ...prev,
-                 location: {
-                   latitude: lat,
-                   longitude: lon,
-                   addressString: `위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`
-                 }
-               }));
-             }
-             setIsLoading(false);
-          });
-        } else {
-          setFormData(prev => ({
-            ...prev,
-            location: {
-              latitude: lat,
-              longitude: lon,
-              addressString: `위도: ${lat.toFixed(4)}, 경도: ${lon.toFixed(4)}`
-            }
-          }));
-          setIsLoading(false);
-        }
+        getAddressFromCoords(lat, lon);
       },
       (error) => {
         alert(`위치 정보를 가져올 수 없습니다: ${error.message}`);
         setIsLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 

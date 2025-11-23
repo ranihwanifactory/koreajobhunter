@@ -25,10 +25,6 @@ const HeroSection: React.FC = () => {
             빠른 배정
           </div>
           <div className="flex items-center gap-1">
-            <i className="fas fa-coins text-yellow-300"></i>
-            당일 지급
-          </div>
-          <div className="flex items-center gap-1">
             <i className="fas fa-shield-alt text-yellow-300"></i>
             안전 보장
           </div>
