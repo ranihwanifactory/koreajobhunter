@@ -7,6 +7,8 @@ export const BUSINESS_INFO: BusinessInfo = {
   bizNumber: '255-40-00421'
 };
 
+export const ADMIN_EMAIL = 'acehwan69@gmail.com';
+
 export const JOB_TYPES_LIST = [
   { label: '건설/현장', value: JobType.CONSTRUCTION, icon: 'fa-hammer' },
   { label: '농촌/농업', value: JobType.AGRICULTURE, icon: 'fa-seedling' },

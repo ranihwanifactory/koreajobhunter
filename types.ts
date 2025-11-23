@@ -8,6 +8,10 @@ export enum JobType {
 }
 
 export interface WorkerProfile {
+  id?: string; // Firestore Document ID
+  email?: string;
+  updatedAt?: string;
+  
   name: string;
   phone: string;
   bankName: string;

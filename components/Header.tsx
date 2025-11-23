@@ -5,9 +5,12 @@ import { User } from 'firebase/auth';
 
 interface HeaderProps {
   user: User | null;
+  isAdmin?: boolean;
+  onToggleAdmin?: () => void;
+  isAdminView?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ user }) => {
+const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminView }) => {
   const handleShare = async () => {
     const shareData = {
       title: BUSINESS_INFO.name,
@@ -44,9 +47,27 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
             젊
           </div>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight">{BUSINESS_INFO.name}</h1>
+          {isAdmin && (
+             <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full font-bold border border-red-200">
+               관리자
+             </span>
+          )}
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+           {isAdmin && (
+            <button
+              onClick={onToggleAdmin}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                isAdminView 
+                ? 'bg-slate-800 text-white' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {isAdminView ? '사용자모드' : '관리자모드'}
+            </button>
+          )}
+
           <button 
             onClick={handleShare}
             className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors"
@@ -57,7 +78,7 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
           
           <button 
             onClick={handleInstallInfo}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors hidden sm:flex"
             aria-label="앱 설치 안내"
           >
             <i className="fas fa-download text-sm"></i>
