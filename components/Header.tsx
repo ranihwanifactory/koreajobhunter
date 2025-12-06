@@ -276,10 +276,10 @@ const Header: React.FC<HeaderProps> = ({
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <a href="/" onClick={handleLogoClick} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm shadow-brand-200">
+              <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm shadow-brand-200 shrink-0">
                 젊
               </div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">{BUSINESS_INFO.name}</h1>
+              <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight hidden xs:block">{BUSINESS_INFO.name}</h1>
             </a>
             
             {isAdmin && (
@@ -337,16 +337,16 @@ const Header: React.FC<HeaderProps> = ({
             {installPrompt && (
               <button
                 onClick={handleInstallClick}
-                className="px-3 py-1.5 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200 flex items-center gap-1 hidden sm:flex"
+                className="px-3 py-1.5 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200 flex items-center gap-1 animate-pulse"
               >
                 <i className="fas fa-download text-xs"></i>
-                <span className="hidden sm:inline text-xs">앱 설치</span>
+                <span className="text-xs whitespace-nowrap">앱 설치</span>
               </button>
             )}
             
             <button 
               onClick={handleShare}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors shrink-0"
               aria-label="공유하기"
             >
               <i className="fas fa-share-alt"></i>
@@ -356,7 +356,7 @@ const Header: React.FC<HeaderProps> = ({
               <div className="relative" ref={notiRef}>
                 <button 
                   onClick={handleBellClick}
-                  className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors relative"
+                  className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors relative shrink-0"
                   aria-label="알림"
                 >
                   <i className={`fas fa-bell ${hasNew ? 'text-brand-600 animate-pulse' : ''}`}></i>
@@ -418,7 +418,7 @@ const Header: React.FC<HeaderProps> = ({
             {user ? (
               <button 
                 onClick={handleLogout}
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-red-500 hover:bg-red-50 transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-red-500 hover:bg-red-50 transition-colors shrink-0"
                 aria-label="로그아웃"
               >
                 <i className="fas fa-sign-out-alt"></i>
@@ -426,7 +426,7 @@ const Header: React.FC<HeaderProps> = ({
             ) : (
               <button
                 onClick={onLoginClick}
-                className="px-4 py-1.5 bg-brand-600 text-white text-sm font-bold rounded-full hover:bg-brand-700 transition-colors shadow-sm shadow-brand-200"
+                className="px-4 py-1.5 bg-brand-600 text-white text-sm font-bold rounded-full hover:bg-brand-700 transition-colors shadow-sm shadow-brand-200 whitespace-nowrap"
               >
                 로그인
               </button>
