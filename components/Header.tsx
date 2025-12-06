@@ -11,9 +11,10 @@ interface HeaderProps {
   isAdmin?: boolean;
   onToggleAdmin?: () => void;
   isAdminView?: boolean;
+  onLoginClick?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminView }) => {
+const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminView, onLoginClick }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNoti, setShowNoti] = useState(false);
   const [hasNew, setHasNew] = useState(false);
@@ -125,7 +126,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100">
-      <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Logo & Home Link */}
           <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -136,7 +137,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
           </a>
           
           {isAdmin && (
-             <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full font-bold border border-red-200">
+             <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full font-bold border border-red-200 hidden sm:inline-block">
                관리자
              </span>
           )}
@@ -146,7 +147,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
            {isAdmin && (
             <button
               onClick={onToggleAdmin}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors hidden sm:block ${
                 isAdminView 
                 ? 'bg-slate-800 text-white' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -164,77 +165,86 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
             <i className="fas fa-share-alt"></i>
           </button>
           
-          {/* Notification Bell */}
-          <div className="relative" ref={notiRef}>
-            <button 
-              onClick={handleBellClick}
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors relative"
-              aria-label="알림"
-            >
-              <i className={`fas fa-bell ${hasNew ? 'text-brand-600 animate-pulse' : ''}`}></i>
-              {hasNew && (
-                <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
-              )}
-            </button>
+          {/* Notification Bell (Only show if logged in) */}
+          {user && (
+            <div className="relative" ref={notiRef}>
+              <button 
+                onClick={handleBellClick}
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors relative"
+                aria-label="알림"
+              >
+                <i className={`fas fa-bell ${hasNew ? 'text-brand-600 animate-pulse' : ''}`}></i>
+                {hasNew && (
+                  <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+                )}
+              </button>
 
-            {/* Notification Dropdown */}
-            {showNoti && (
-              <div className="absolute top-12 right-0 w-80 bg-white shadow-xl rounded-xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
-                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                  <h3 className="font-bold text-sm text-gray-800">알림 센터</h3>
-                  <div className="flex items-center gap-3">
-                     <button 
-                        onClick={handleClearAll}
-                        className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-                     >
-                        모두 지우기
-                     </button>
+              {/* Notification Dropdown */}
+              {showNoti && (
+                <div className="absolute top-12 right-0 w-80 bg-white shadow-xl rounded-xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 className="font-bold text-sm text-gray-800">알림 센터</h3>
+                    <div className="flex items-center gap-3">
+                      <button 
+                          onClick={handleClearAll}
+                          className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                          모두 지우기
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {visibleNotifications.length === 0 ? (
+                      <div className="p-6 text-center text-gray-500 text-sm">
+                        새로운 알림이 없습니다.
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-gray-100">
+                        {visibleNotifications.map((noti) => (
+                          <li key={noti.id} className="p-4 hover:bg-gray-50 transition-colors relative group">
+                            <div className="flex items-start gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${noti.type === 'job' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+                                <i className={`fas ${noti.type === 'job' ? 'fa-briefcase' : 'fa-info-circle'} text-xs`}></i>
+                              </div>
+                              <div className="flex-1 pr-4">
+                                <h4 className="text-sm font-bold text-gray-800 mb-1">{noti.title}</h4>
+                                <p className="text-xs text-gray-600 leading-snug mb-1">{noti.message}</p>
+                                <span className="text-[10px] text-gray-400">
+                                  {new Date(noti.createdAt).toLocaleDateString()} {new Date(noti.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </span>
+                              </div>
+                              <button 
+                                  onClick={(e) => handleDeleteNoti(e, noti.id)}
+                                  className="absolute top-3 right-3 text-gray-300 hover:text-red-500 p-1 transition-colors"
+                                  aria-label="삭제"
+                              >
+                                  <i className="fas fa-times text-sm"></i>
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {visibleNotifications.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500 text-sm">
-                      새로운 알림이 없습니다.
-                    </div>
-                  ) : (
-                    <ul className="divide-y divide-gray-100">
-                      {visibleNotifications.map((noti) => (
-                        <li key={noti.id} className="p-4 hover:bg-gray-50 transition-colors relative group">
-                          <div className="flex items-start gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${noti.type === 'job' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
-                              <i className={`fas ${noti.type === 'job' ? 'fa-briefcase' : 'fa-info-circle'} text-xs`}></i>
-                            </div>
-                            <div className="flex-1 pr-4">
-                              <h4 className="text-sm font-bold text-gray-800 mb-1">{noti.title}</h4>
-                              <p className="text-xs text-gray-600 leading-snug mb-1">{noti.message}</p>
-                              <span className="text-[10px] text-gray-400">
-                                {new Date(noti.createdAt).toLocaleDateString()} {new Date(noti.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                              </span>
-                            </div>
-                            <button 
-                                onClick={(e) => handleDeleteNoti(e, noti.id)}
-                                className="absolute top-3 right-3 text-gray-300 hover:text-red-500 p-1 transition-colors"
-                                aria-label="삭제"
-                            >
-                                <i className="fas fa-times text-sm"></i>
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
-          {user && (
+          {user ? (
             <button 
               onClick={handleLogout}
               className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-red-500 hover:bg-red-50 transition-colors"
               aria-label="로그아웃"
             >
               <i className="fas fa-sign-out-alt"></i>
+            </button>
+          ) : (
+            <button
+              onClick={onLoginClick}
+              className="px-4 py-1.5 bg-brand-600 text-white text-sm font-bold rounded-full hover:bg-brand-700 transition-colors shadow-sm shadow-brand-200"
+            >
+              로그인
             </button>
           )}
         </div>

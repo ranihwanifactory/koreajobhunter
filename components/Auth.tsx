@@ -1,9 +1,14 @@
+
 import React, { useState } from 'react';
 import { auth, googleProvider } from '../services/firebase';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { BUSINESS_INFO } from '../constants';
 
-const Auth: React.FC = () => {
+interface AuthProps {
+  onCancel?: () => void;
+}
+
+const Auth: React.FC<AuthProps> = ({ onCancel }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,8 +57,19 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-6">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-6 relative animate-fade-in-up">
+        
+        {/* Close Button */}
+        {onCancel && (
+          <button 
+            onClick={onCancel}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <i className="fas fa-times text-lg"></i>
+          </button>
+        )}
+
         <div className="text-center space-y-2">
           <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4">
             젊
