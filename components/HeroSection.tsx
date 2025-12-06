@@ -6,10 +6,14 @@ const HeroSection: React.FC = () => {
     <div className="relative mb-8">
       {/* Main Banner Background */}
       <div className="bg-slate-900 rounded-3xl overflow-hidden shadow-2xl shadow-slate-900/20 relative">
-        {/* Abstract Background Pattern */}
-        <div className="absolute inset-0 opacity-20">
-            <div className="absolute -top-24 -right-24 w-96 h-96 bg-brand-500 rounded-full blur-3xl"></div>
-            <div className="absolute top-1/2 -left-24 w-72 h-72 bg-blue-400 rounded-full blur-3xl"></div>
+        {/* Image Background with Overlay */}
+        <div className="absolute inset-0 z-0">
+            <img 
+                src="https://search.pstatic.net/common/?src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20191217_182%2F1576547683994rVjL5_JPEG%2Fb1zVapPF8IqIvzScb22GuXY5.jpg" 
+                alt="Background" 
+                className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/60"></div>
         </div>
 
         <div className="relative z-10 px-6 py-10 md:py-14 md:px-12 flex flex-col md:flex-row items-center justify-between gap-8">
@@ -21,14 +25,14 @@ const HeroSection: React.FC = () => {
               성주 지역 최대 인력 보유
             </div>
             
-            <h1 className="text-3xl md:text-5xl font-extrabold text-white leading-tight mb-4 tracking-tight">
+            <h1 className="text-3xl md:text-5xl font-extrabold text-white leading-tight mb-4 tracking-tight drop-shadow-lg">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-200 to-white">
                 건설 · 공장 · 농촌
               </span><br/>
               인력 확실하게 공급합니다!
             </h1>
             
-            <p className="text-slate-300 text-sm md:text-lg mb-8 leading-relaxed">
+            <p className="text-slate-200 text-sm md:text-lg mb-8 leading-relaxed drop-shadow-md">
               <span className="font-semibold text-white">내국인</span>부터 성실한 <span className="font-semibold text-yellow-400">외국인 인력</span>까지 다수 보유.<br className="hidden md:block"/>
               규모가 다른 인력 네트워크로 <span className="underline decoration-brand-500 underline-offset-4">100% 출근을 보장</span>해 드립니다.
             </p>
@@ -52,7 +56,7 @@ const HeroSection: React.FC = () => {
 
           {/* Right Side Visuals (Cards) */}
           <div className="w-full md:w-auto flex flex-col gap-3 min-w-[280px]">
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/20 transition-colors cursor-default">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center gap-4 hover:bg-white/20 transition-colors cursor-default shadow-lg">
               <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center text-green-400 text-xl">
                 <i className="fas fa-seedling"></i>
               </div>
@@ -62,7 +66,7 @@ const HeroSection: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/20 transition-colors cursor-default">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center gap-4 hover:bg-white/20 transition-colors cursor-default shadow-lg">
               <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 text-xl">
                 <i className="fas fa-industry"></i>
               </div>
@@ -72,7 +76,7 @@ const HeroSection: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-xl flex items-center gap-4 hover:bg-white/20 transition-colors cursor-default">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center gap-4 hover:bg-white/20 transition-colors cursor-default shadow-lg">
               <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center text-orange-400 text-xl">
                 <i className="fas fa-hard-hat"></i>
               </div>
