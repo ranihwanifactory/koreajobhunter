@@ -1,0 +1,72 @@
+
+import React, { useEffect, useState } from 'react';
+import { db } from '../services/firebase';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { WorkerProfile } from '../types';
+
+const maskName = (name: string) => {
+  if (!name) return '***';
+  return name.charAt(0) + '**';
+};
+
+const TickerItem: React.FC<{ worker: WorkerProfile }> = ({ worker }) => (
+  <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700/50 backdrop-blur-sm">
+    <span className="bg-brand-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm shadow-brand-500/50">
+      {worker.desiredJobs?.[0] || '인력'}
+    </span>
+    <span className="font-bold text-slate-200 text-sm tracking-wide">
+      {maskName(worker.name)}
+    </span>
+    <span className="text-xs text-slate-500 border-l border-slate-600 pl-2">
+        {worker.location?.addressString?.split(' ')[0] || '대기중'}
+    </span>
+  </div>
+);
+
+const WorkerTicker: React.FC = () => {
+  const [workers, setWorkers] = useState<WorkerProfile[]>([]);
+
+  useEffect(() => {
+    const fetchWorkers = async () => {
+      try {
+        // Fetch recently updated workers
+        const q = query(collection(db, 'workers'), orderBy('updatedAt', 'desc'), limit(15));
+        const snapshot = await getDocs(q);
+        const list = snapshot.docs.map(doc => doc.data() as WorkerProfile);
+        setWorkers(list);
+      } catch (e) {
+        console.error("Failed to fetch workers for ticker", e);
+      }
+    };
+    fetchWorkers();
+  }, []);
+
+  if (workers.length === 0) return null;
+
+  // Ensure we have enough items to scroll smoothly by duplicating if list is short
+  const displayList = workers.length < 5 ? [...workers, ...workers, ...workers] : workers;
+
+  return (
+    <div className="w-full bg-slate-900 overflow-hidden py-3 shadow-inner border-y border-slate-800 mb-6">
+       <div className="flex items-center gap-2 mb-1 px-4 text-xs font-bold text-brand-400">
+          <i className="fas fa-satellite-dish animate-pulse"></i> 실시간 대기 인력
+       </div>
+       <div className="flex overflow-hidden relative w-full mask-image-gradient-sides">
+          {/* First loop */}
+          <div className="animate-marquee flex gap-4 min-w-full shrink-0 items-center px-4">
+            {displayList.map((w, i) => (
+              <TickerItem key={`t1-${i}`} worker={w} />
+            ))}
+          </div>
+          {/* Second loop (Seamless transition) */}
+          <div className="animate-marquee flex gap-4 min-w-full shrink-0 items-center px-4">
+            {displayList.map((w, i) => (
+              <TickerItem key={`t2-${i}`} worker={w} />
+            ))}
+          </div>
+       </div>
+    </div>
+  );
+};
+
+export default WorkerTicker;

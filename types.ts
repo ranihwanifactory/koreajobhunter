@@ -1,6 +1,11 @@
 
 export enum JobType {
   CONSTRUCTION = '건설/현장',
+  CARPENTER = '목수/목공',
+  WELDER = '용접',
+  ELECTRICIAN = '전기',
+  PAINTING = '도장/방수',
+  TILING = '타일/미장',
   AGRICULTURE = '농촌/농업',
   FACTORY = '공장/생산',
   CLEANING = '청소/미화',
