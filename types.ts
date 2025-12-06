@@ -36,6 +36,11 @@ export interface WorkerProfile {
   safetyCertImageUrl?: string;
   
   isAgreed: boolean;
+  
+  // Settings
+  notificationSettings?: {
+    jobPostings: boolean;
+  };
 }
 
 export interface BusinessInfo {

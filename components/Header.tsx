@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { BUSINESS_INFO } from '../constants';
 import { auth, db } from '../services/firebase';
 import { User } from 'firebase/auth';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { AppNotification } from '../types';
+import { collection, query, orderBy, limit, onSnapshot, doc } from 'firebase/firestore';
+import { AppNotification, WorkerProfile } from '../types';
 
 interface HeaderProps {
   user: User | null;
@@ -21,6 +21,9 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const notiRef = useRef<HTMLDivElement>(null);
   
+  // User settings (default: receive notifications)
+  const [allowJobNotifications, setAllowJobNotifications] = useState(true);
+
   // State for In-App Toast Notification
   const [toast, setToast] = useState<{ visible: boolean; title: string; message: string }>({
     visible: false,
@@ -54,6 +57,28 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
     localStorage.setItem(`dismissed_notis_${user.uid}`, JSON.stringify(ids));
   };
 
+  // Listen to user profile for notification settings
+  useEffect(() => {
+    if (!user) return;
+
+    const unsub = onSnapshot(doc(db, 'workers', user.uid), (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data() as WorkerProfile;
+            // If setting exists, use it. If not (old account), default to true.
+            if (data.notificationSettings?.jobPostings !== undefined) {
+                setAllowJobNotifications(data.notificationSettings.jobPostings);
+            } else {
+                setAllowJobNotifications(true);
+            }
+        } else {
+            // No profile yet, default to true
+            setAllowJobNotifications(true);
+        }
+    });
+
+    return () => unsub();
+  }, [user]);
+
   // 알림 가져오기 및 실시간 리스너
   useEffect(() => {
     if (!user) return;
@@ -79,6 +104,11 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
           if (change.type === 'added') {
             const newNoti = change.doc.data() as AppNotification;
             
+            // Check User Setting: if it's a job notification and user disabled it, skip.
+            if (newNoti.type === 'job' && !allowJobNotifications) {
+                return;
+            }
+
             // 1. Browser System Notification
             if ("Notification" in window && Notification.permission === "granted") {
               try {
@@ -121,7 +151,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, allowJobNotifications]); // Added allowJobNotifications dependency to refresh if logic needs it, though mostly used inside callback
 
   // 외부 클릭 시 닫기
   useEffect(() => {

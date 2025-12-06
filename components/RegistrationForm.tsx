@@ -45,7 +45,10 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     introduction: '',
     idCardImageUrl: '',
     safetyCertImageUrl: '',
-    isAgreed: false
+    isAgreed: false,
+    notificationSettings: {
+      jobPostings: true
+    }
   });
 
   // Load existing data on mount
@@ -72,7 +75,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
             introduction: data.introduction || '',
             idCardImageUrl: data.idCardImageUrl || '',
             safetyCertImageUrl: data.safetyCertImageUrl || '',
-            isAgreed: !!data.isAgreed
+            isAgreed: !!data.isAgreed,
+            notificationSettings: data.notificationSettings || { jobPostings: true }
           });
         }
       } catch (error) {
@@ -114,6 +118,16 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
         return { ...prev, desiredJobs: [...prev.desiredJobs, job] };
       }
     });
+  };
+
+  const toggleNotification = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      notificationSettings: {
+        ...prev.notificationSettings,
+        jobPostings: e.target.checked
+      }
+    }));
   };
 
   // Helper to wait for Kakao API
@@ -377,7 +391,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
         safetyCertImageUrl: safetyCertUrl || '',
         email: user.email || '',
         updatedAt: new Date().toISOString(),
-        isAgreed: true
+        isAgreed: true,
+        notificationSettings: formData.notificationSettings || { jobPostings: true }
       };
 
       await setDoc(doc(db, "workers", user.uid), dataToSave);
@@ -597,7 +612,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
           <div className="space-y-6 animate-fade-in">
              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
               <span className="w-7 h-7 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center text-sm">3</span>
-              서류 및 자기소개
+              서류 및 설정
             </h2>
 
             {/* Document Upload Section */}
@@ -662,7 +677,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
             </div>
 
             <hr className="border-gray-100 my-4" />
-
+            
+            {/* Intro */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="text-sm font-medium text-gray-700">한줄 소개</label>
@@ -684,6 +700,30 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
                 className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-brand-500 outline-none resize-none"
                 placeholder="성실하게 일하겠습니다! (AI 자동완성을 눌러보세요)"
               />
+            </div>
+
+            {/* Notification Setting */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="flex items-center gap-3">
+                   <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                     <i className="fas fa-bell"></i>
+                   </div>
+                   <div className="text-sm">
+                      <span className="font-bold text-gray-800 block">새로운 일자리 알림</span>
+                      <span className="text-xs text-gray-500">신규 일자리가 등록되면 푸시 알림을 받습니다.</span>
+                   </div>
+                </div>
+                <div className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={formData.notificationSettings?.jobPostings ?? true}
+                    onChange={toggleNotification}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </div>
+              </label>
             </div>
 
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
