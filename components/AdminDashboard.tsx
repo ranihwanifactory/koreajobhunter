@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { db, storage } from '../services/firebase';
-import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { WorkerProfile, JobType, JobPosting, AppNotification } from '../types';
 import { JOB_TYPES_LIST } from '../constants';
@@ -53,6 +53,10 @@ const AdminDashboard: React.FC = () => {
     isUrgent: false,
     createdAt: ''
   });
+  
+  // Job Editing State
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [editJobForm, setEditJobForm] = useState<Partial<JobPosting>>({});
 
   useEffect(() => {
     if (activeTab === 'workers') {
@@ -486,26 +490,24 @@ const AdminDashboard: React.FC = () => {
 
   const fetchJobs = async () => {
     setJobLoading(true);
-    try {
-      const q = query(collection(db, 'job_postings'), orderBy('createdAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const jobList: JobPosting[] = [];
-      querySnapshot.forEach((doc) => {
-        jobList.push({ id: doc.id, ...doc.data() } as JobPosting);
-      });
-      setJobs(jobList);
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-    } finally {
-      setJobLoading(false);
-    }
+    // Use onSnapshot for admin as well to see realtime updates
+    const q = query(collection(db, 'job_postings'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const jobList: JobPosting[] = [];
+        snapshot.forEach((doc) => {
+            jobList.push({ id: doc.id, ...doc.data() } as JobPosting);
+        });
+        setJobs(jobList);
+        setJobLoading(false);
+    });
+    // This hook is simple, we might want to store unsubscribe but for now useEffect handles it minimally
   };
 
   const handleJobDelete = async (id: string) => {
     if (window.confirm('이 일자리 정보를 삭제하시겠습니까?')) {
       try {
         await deleteDoc(doc(db, 'job_postings', id));
-        setJobs(prev => prev.filter(job => job.id !== id));
+        // State update handled by onSnapshot
       } catch (error) {
         console.error("Error deleting job:", error);
         alert('삭제 중 오류가 발생했습니다.');
@@ -532,7 +534,6 @@ const AdminDashboard: React.FC = () => {
       };
       
       const docRef = await addDoc(collection(db, 'job_postings'), jobData);
-      setJobs(prev => [{ ...jobData, id: docRef.id }, ...prev]);
 
       // Notification 생성
       try {
@@ -563,6 +564,44 @@ const AdminDashboard: React.FC = () => {
     } catch (error) {
       console.error("Error adding job:", error);
       alert('등록 중 오류가 발생했습니다.');
+    }
+  };
+
+  // --- Job Edit Functions ---
+  const startJobEdit = (job: JobPosting) => {
+    setEditingJobId(job.id!);
+    setEditJobForm({ ...job });
+  };
+
+  const cancelJobEdit = () => {
+    setEditingJobId(null);
+    setEditJobForm({});
+  };
+
+  const handleEditJobChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+     const { name, value, type } = e.target;
+     // Handle checkbox specifically
+     if (type === 'checkbox') {
+        const checked = (e.target as HTMLInputElement).checked;
+        setEditJobForm(prev => ({ ...prev, [name]: checked }));
+     } else {
+        setEditJobForm(prev => ({ ...prev, [name]: value }));
+     }
+  };
+
+  const saveJobEdit = async () => {
+    if (!editingJobId) return;
+    try {
+        const jobRef = doc(db, 'job_postings', editingJobId);
+        await updateDoc(jobRef, {
+            ...editJobForm,
+        });
+        setEditingJobId(null);
+        setEditJobForm({});
+        alert('일자리가 수정되었습니다.');
+    } catch (e) {
+        console.error(e);
+        alert('수정 실패');
     }
   };
 
@@ -638,8 +677,7 @@ const AdminDashboard: React.FC = () => {
 
           {isAdding && (
              <div className="bg-white border-2 border-brand-100 rounded-2xl p-5 shadow-lg animate-fade-in-up">
-                 {/* ... (Existing add worker form code remains same but encapsulated here) ... */}
-                 <h3 className="font-bold text-lg text-brand-800 mb-4 flex items-center gap-2">
+                  <h3 className="font-bold text-lg text-brand-800 mb-4 flex items-center gap-2">
                       <i className="fas fa-user-plus"></i> 인력 직접 등록
                   </h3>
                   <form onSubmit={handleAddSubmit} className="space-y-4">
@@ -719,7 +757,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-center border-b border-gray-100 pb-2">
                         <span className="text-sm font-bold text-brand-600">정보 수정</span>
                     </div>
-                    {/* Fields (Simplified for brevity as logic is same as before) */}
+                    {/* Fields */}
                     <div className="grid grid-cols-2 gap-3">
                         <input type="text" name="name" value={editForm.name} onChange={handleEditChange} className="border p-2 rounded text-sm" placeholder="이름" />
                         <input type="tel" name="phone" value={editForm.phone} onChange={handleEditChange} className="border p-2 rounded text-sm" placeholder="전화" />
@@ -728,7 +766,6 @@ const AdminDashboard: React.FC = () => {
                          <input type="text" name="addressString" value={editForm.location?.addressString} onChange={handleEditChange} className="flex-1 border p-2 rounded text-sm" placeholder="주소" />
                          <button onClick={() => handleSearchAddress(true)} className="bg-brand-600 text-white px-2 rounded text-xs">검색</button>
                     </div>
-                    {/* ... Other fields ... */}
                     <div className="grid grid-cols-2 gap-3">
                          <input type="text" name="bankName" value={editForm.bankName} onChange={handleEditChange} className="border p-2 rounded text-sm" placeholder="은행" />
                          <input type="text" name="accountNumber" value={editForm.accountNumber} onChange={handleEditChange} className="border p-2 rounded text-sm" placeholder="계좌" />
@@ -846,36 +883,74 @@ const AdminDashboard: React.FC = () => {
             ) : (
               jobs.map(job => (
                 <div key={job.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm relative">
-                  {job.isUrgent && <span className="absolute top-4 right-4 text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded-full font-bold">긴급</span>}
-                  
-                  <div className="pr-12">
-                     <h3 className="font-bold text-gray-800 text-lg mb-1">{job.content}</h3>
-                     <p className="text-sm text-brand-600 font-medium mb-3">{job.companyName}</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-y-2 text-xs text-gray-600 bg-gray-50 p-3 rounded-lg mb-3">
-                    <div className="col-span-2 flex items-center gap-2">
-                       <i className="fas fa-map-marker-alt w-4 text-center text-gray-400"></i> {job.address}
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <i className="fas fa-won-sign w-4 text-center text-gray-400"></i> {job.pay}
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <i className="far fa-calendar-alt w-4 text-center text-gray-400"></i> {job.date}
-                    </div>
-                  </div>
+                  {editingJobId === job.id ? (
+                      // --- EDIT JOB FORM ---
+                      <div className="space-y-3 animate-fade-in bg-blue-50/50 p-2 rounded-xl -m-2">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-bold text-brand-600">일자리 수정</span>
+                        </div>
+                        <input type="text" name="content" value={editJobForm.content || ''} onChange={handleEditJobChange} className="w-full border p-2 rounded text-sm" placeholder="업무 내용" />
+                        <div className="grid grid-cols-2 gap-2">
+                             <input type="text" name="companyName" value={editJobForm.companyName || ''} onChange={handleEditJobChange} className="border p-2 rounded text-sm" placeholder="업체명" />
+                             <input type="text" name="pay" value={editJobForm.pay || ''} onChange={handleEditJobChange} className="border p-2 rounded text-sm" placeholder="급여" />
+                        </div>
+                        <input type="text" name="address" value={editJobForm.address || ''} onChange={handleEditJobChange} className="w-full border p-2 rounded text-sm" placeholder="주소" />
+                        <div className="grid grid-cols-2 gap-2">
+                             <input type="text" name="date" value={editJobForm.date || ''} onChange={handleEditJobChange} className="border p-2 rounded text-sm" placeholder="날짜" />
+                             <input type="text" name="contact" value={editJobForm.contact || ''} onChange={handleEditJobChange} className="border p-2 rounded text-sm" placeholder="연락처" />
+                        </div>
+                        <label className="flex items-center gap-2">
+                             <input type="checkbox" name="isUrgent" checked={!!editJobForm.isUrgent} onChange={handleEditJobChange} className="text-red-500" />
+                             <span className="text-xs font-bold text-red-500">긴급</span>
+                        </label>
+                        <div className="flex gap-2 pt-2">
+                          <button onClick={cancelJobEdit} className="flex-1 bg-white border border-gray-300 py-2 rounded-lg text-sm font-bold hover:bg-gray-50">취소</button>
+                          <button onClick={saveJobEdit} className="flex-1 bg-brand-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-brand-700">수정 완료</button>
+                        </div>
+                      </div>
+                  ) : (
+                      // --- VIEW JOB CARD ---
+                      <>
+                        {job.isUrgent && <span className="absolute top-4 right-4 text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded-full font-bold">긴급</span>}
+                        
+                        <div className="pr-12">
+                           <h3 className="font-bold text-gray-800 text-lg mb-1">{job.content}</h3>
+                           <p className="text-sm text-brand-600 font-medium mb-3">{job.companyName}</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-y-2 text-xs text-gray-600 bg-gray-50 p-3 rounded-lg mb-3">
+                          <div className="col-span-2 flex items-center gap-2">
+                             <i className="fas fa-map-marker-alt w-4 text-center text-gray-400"></i> {job.address}
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <i className="fas fa-won-sign w-4 text-center text-gray-400"></i> {job.pay}
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <i className="far fa-calendar-alt w-4 text-center text-gray-400"></i> {job.date}
+                          </div>
+                        </div>
 
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                    <span className="text-xs text-gray-400">
-                        {new Date(job.createdAt).toLocaleDateString()} 등록
-                    </span>
-                    <button 
-                      onClick={() => handleJobDelete(job.id!)}
-                      className="text-red-500 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
-                    >
-                      <i className="fas fa-trash mr-1"></i> 삭제
-                    </button>
-                  </div>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                          <span className="text-xs text-gray-400">
+                              {new Date(job.createdAt).toLocaleDateString()} 등록
+                          </span>
+                          <div className="flex gap-2">
+                             <button 
+                                onClick={() => startJobEdit(job)}
+                                className="text-blue-500 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                              >
+                                <i className="fas fa-edit mr-1"></i> 수정
+                              </button>
+                              <button 
+                                onClick={() => handleJobDelete(job.id!)}
+                                className="text-red-500 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
+                              >
+                                <i className="fas fa-trash mr-1"></i> 삭제
+                              </button>
+                          </div>
+                        </div>
+                      </>
+                  )}
                 </div>
               ))
             )}
