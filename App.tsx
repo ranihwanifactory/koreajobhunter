@@ -10,6 +10,7 @@ import JobBoard from './components/JobBoard';
 import WorkerTicker from './components/WorkerTicker';
 import MyProfile from './components/MyProfile';
 import Gallery from './components/Gallery';
+import OfficeMap from './components/OfficeMap';
 import { BUSINESS_INFO, ADMIN_EMAIL } from './constants';
 import { auth } from './services/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -159,17 +160,12 @@ function App() {
                 <div className="lg:col-span-1 space-y-6">
                   <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 sticky top-24">
                     <h3 className="font-bold text-gray-800 mb-3">사무소 오시는 길</h3>
-                    <div className="aspect-video bg-gray-200 rounded-lg mb-4 flex items-center justify-center relative overflow-hidden group cursor-pointer">
-                      <img 
-                          src="https://picsum.photos/600/300?random=1" 
-                          alt="Map Placeholder" 
-                          className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500" 
-                      />
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 text-white backdrop-blur-[1px]">
-                          <i className="fas fa-map-marked-alt text-3xl mb-2"></i>
-                          <span className="font-bold text-center px-4">{BUSINESS_INFO.address}</span>
-                      </div>
+                    
+                    {/* Replaced static image with interactive OfficeMap */}
+                    <div className="aspect-video w-full mb-4 shadow-inner rounded-lg overflow-hidden border border-gray-200">
+                        <OfficeMap address={BUSINESS_INFO.address} />
                     </div>
+
                     <button 
                       onClick={handleCall}
                       className="w-full bg-slate-800 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-900 transition-colors shadow-lg shadow-slate-200"
