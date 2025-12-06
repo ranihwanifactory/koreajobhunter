@@ -1,4 +1,5 @@
 
+
 export enum JobType {
   CONSTRUCTION = '건설/현장',
   CARPENTER = '목수/목공',
@@ -42,6 +43,9 @@ export interface BusinessInfo {
   phone: string;
   address: string;
   bizNumber: string;
+  representative: string;
+  email: string;
+  bankAccount: string;
 }
 
 export interface JobPosting {

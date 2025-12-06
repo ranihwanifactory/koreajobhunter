@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/firebase';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { WorkerProfile } from '../types';
 
 const maskName = (name: string) => {
@@ -32,18 +32,17 @@ const WorkerTicker: React.FC = () => {
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
 
   useEffect(() => {
-    const fetchWorkers = async () => {
-      try {
-        // Fetch recently updated workers
-        const q = query(collection(db, 'workers'), orderBy('updatedAt', 'desc'), limit(15));
-        const snapshot = await getDocs(q);
-        const list = snapshot.docs.map(doc => doc.data() as WorkerProfile);
-        setWorkers(list);
-      } catch (e) {
-        console.error("Failed to fetch workers for ticker", e);
-      }
-    };
-    fetchWorkers();
+    // onSnapshot을 사용하여 실시간으로 최근 인력 정보를 가져옵니다.
+    const q = query(collection(db, 'workers'), orderBy('updatedAt', 'desc'), limit(15));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(doc => doc.data() as WorkerProfile);
+      setWorkers(list);
+    }, (error) => {
+      console.error("Failed to fetch workers for ticker", error);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   if (workers.length === 0) return null;

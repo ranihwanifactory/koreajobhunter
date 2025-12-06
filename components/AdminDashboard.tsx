@@ -58,44 +58,68 @@ const AdminDashboard: React.FC = () => {
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [editJobForm, setEditJobForm] = useState<Partial<JobPosting>>({});
 
+  // Unified Realtime Listener Setup
   useEffect(() => {
+    let unsubscribeWorkers: (() => void) | undefined;
+    let unsubscribeJobs: (() => void) | undefined;
+
     if (activeTab === 'workers') {
-      fetchWorkers();
+      setWorkerLoading(true);
+      const q = query(collection(db, 'workers'));
+      
+      unsubscribeWorkers = onSnapshot(q, (snapshot) => {
+        const workersList: WorkerProfile[] = [];
+        snapshot.forEach((doc) => {
+          workersList.push({ id: doc.id, ...doc.data() } as WorkerProfile);
+        });
+        
+        // Client-side sorting because Firestore indexes might be tricky with mixed queries sometimes,
+        // but simple orderBy('updatedAt') is fine. Here we stick to memory sort for safety.
+        workersList.sort((a, b) => {
+          const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          return dateB - dateA;
+        });
+
+        setWorkers(workersList);
+        setWorkerLoading(false);
+      }, (error) => {
+        console.error("Error fetching workers realtime:", error);
+        setWorkerLoading(false);
+      });
+
     } else {
-      fetchJobs();
+      setJobLoading(true);
+      const q = query(collection(db, 'job_postings'), orderBy('createdAt', 'desc'));
+      
+      unsubscribeJobs = onSnapshot(q, (snapshot) => {
+        const jobList: JobPosting[] = [];
+        snapshot.forEach((doc) => {
+            jobList.push({ id: doc.id, ...doc.data() } as JobPosting);
+        });
+        setJobs(jobList);
+        setJobLoading(false);
+      }, (error) => {
+        console.error("Error fetching jobs realtime:", error);
+        setJobLoading(false);
+      });
     }
+
+    return () => {
+      if (unsubscribeWorkers) unsubscribeWorkers();
+      if (unsubscribeJobs) unsubscribeJobs();
+    };
   }, [activeTab]);
 
   // =================================================================
   // WORKER FUNCTIONS
   // =================================================================
 
-  const fetchWorkers = async () => {
-    setWorkerLoading(true);
-    try {
-      const querySnapshot = await getDocs(collection(db, 'workers'));
-      const workersList: WorkerProfile[] = [];
-      querySnapshot.forEach((doc) => {
-        workersList.push({ id: doc.id, ...doc.data() } as WorkerProfile);
-      });
-      workersList.sort((a, b) => {
-        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        return dateB - dateA;
-      });
-      setWorkers(workersList);
-    } catch (error) {
-      console.error("Error fetching workers:", error);
-    } finally {
-      setWorkerLoading(false);
-    }
-  };
-
   const handleDeleteWorker = async (id: string, name: string) => {
     if (window.confirm(`${name} 님의 정보를 정말 삭제하시겠습니까? 복구할 수 없습니다.`)) {
       try {
         await deleteDoc(doc(db, 'workers', id));
-        setWorkers(prev => prev.filter(worker => worker.id !== id));
+        // State update is handled by onSnapshot
         alert('삭제되었습니다.');
       } catch (error) {
         console.error("Error deleting worker:", error);
@@ -355,7 +379,7 @@ const AdminDashboard: React.FC = () => {
       const workerRef = doc(db, 'workers', editingId);
       await updateDoc(workerRef, updateData);
       
-      setWorkers(prev => prev.map(w => w.id === editingId ? { ...w, ...updateData } as WorkerProfile : w));
+      // State update handled by onSnapshot
       setEditingId(null);
       setEditFiles({});
       alert('수정되었습니다.');
@@ -447,8 +471,8 @@ const AdminDashboard: React.FC = () => {
             isAgreed: true
         };
 
-        const docRef = await addDoc(collection(db, 'workers'), workerData);
-        setWorkers(prev => [{ ...workerData, id: docRef.id }, ...prev]);
+        await addDoc(collection(db, 'workers'), workerData);
+        // State update handled by onSnapshot
         
         setIsAdding(false);
         setNewWorker({
@@ -487,21 +511,6 @@ const AdminDashboard: React.FC = () => {
   // =================================================================
   // JOB FUNCTIONS
   // =================================================================
-
-  const fetchJobs = async () => {
-    setJobLoading(true);
-    // Use onSnapshot for admin as well to see realtime updates
-    const q = query(collection(db, 'job_postings'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const jobList: JobPosting[] = [];
-        snapshot.forEach((doc) => {
-            jobList.push({ id: doc.id, ...doc.data() } as JobPosting);
-        });
-        setJobs(jobList);
-        setJobLoading(false);
-    });
-    // This hook is simple, we might want to store unsubscribe but for now useEffect handles it minimally
-  };
 
   const handleJobDelete = async (id: string) => {
     if (window.confirm('이 일자리 정보를 삭제하시겠습니까?')) {
@@ -596,6 +605,7 @@ const AdminDashboard: React.FC = () => {
         await updateDoc(jobRef, {
             ...editJobForm,
         });
+        // State update handled by onSnapshot
         setEditingJobId(null);
         setEditJobForm({});
         alert('일자리가 수정되었습니다.');
@@ -651,9 +661,6 @@ const AdminDashboard: React.FC = () => {
                         }`}
                     >
                         {isAdding ? '닫기' : '+ 직접등록'}
-                    </button>
-                    <button onClick={fetchWorkers} className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200">
-                      <i className="fas fa-sync-alt text-sm"></i>
                     </button>
                 </div>
               </div>

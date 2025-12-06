@@ -1,11 +1,15 @@
 
+
 import { BusinessInfo, JobType } from './types';
 
 export const BUSINESS_INFO: BusinessInfo = {
-  name: '젊은인력',
+  name: '젊은인력사무소',
   phone: '054-933-1566',
   address: '경북 성주군 성주순환로2길 69',
-  bizNumber: '255-40-00421'
+  bizNumber: '255-40-00421',
+  representative: '손영란',
+  email: 'koreajobhunter@naver.com',
+  bankAccount: '농협 302-65550038-11'
 };
 
 export const ADMIN_EMAIL = 'acehwan69@gmail.com';
