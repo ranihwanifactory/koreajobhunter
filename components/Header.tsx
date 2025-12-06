@@ -12,6 +12,8 @@ interface HeaderProps {
   onToggleAdmin?: () => void;
   isAdminView?: boolean;
   onLoginClick?: () => void;
+  onProfileClick?: () => void;
+  isProfileView?: boolean;
 }
 
 declare global {
@@ -20,7 +22,7 @@ declare global {
   }
 }
 
-const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminView, onLoginClick }) => {
+const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminView, onLoginClick, onProfileClick, isProfileView }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNoti, setShowNoti] = useState(false);
   const [hasNew, setHasNew] = useState(false);
@@ -262,6 +264,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
   const handleLogout = () => {
     if (window.confirm('로그아웃 하시겠습니까?')) {
       auth.signOut();
+      window.location.href = "/"; // Force simple reload/redirect
     }
   };
 
@@ -306,6 +309,20 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
               >
                 <i className="fas fa-download text-xs"></i>
                 <span className="hidden sm:inline text-xs">앱 설치</span>
+              </button>
+            )}
+            
+            {user && (
+              <button
+                onClick={onProfileClick}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1 ${
+                    isProfileView 
+                    ? 'bg-brand-600 text-white shadow-md' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                  <i className="fas fa-user"></i>
+                  <span className="hidden sm:inline">내 정보</span>
               </button>
             )}
 

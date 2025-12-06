@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { WorkerProfile } from '../types';
 
@@ -58,14 +59,35 @@ const WorkerMap: React.FC<WorkerMapProps> = ({ workers }) => {
 
           // InfoWindow
           const content = `
-            <div style="padding:5px; font-size:12px; border-radius:4px; background:white; border:1px solid #ddd; min-width:120px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-              <div style="font-weight:bold; color:#333; margin-bottom:2px;">${worker.name}</div>
-              <div style="color:#666;">${worker.desiredJobs?.[0] || '직종미정'}</div>
+            <div style="padding:15px; font-family:sans-serif; min-width:220px; color:#333; background:white; border-radius:8px;">
+              <div style="border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-weight:bold; font-size:16px; color:#111;">${worker.name}</span>
+              </div>
+              <div style="font-size:13px; line-height:1.6; color:#555;">
+                <div style="display:flex; margin-bottom:4px;">
+                  <span style="color:#888; width:50px; flex-shrink:0;">직종</span>
+                  <span style="font-weight:600; color:#2563eb;">${worker.desiredJobs?.join(', ') || '-'}</span>
+                </div>
+                <div style="display:flex; margin-bottom:4px;">
+                  <span style="color:#888; width:50px; flex-shrink:0;">연락처</span>
+                  <span>${worker.phone}</span>
+                </div>
+                <div style="display:flex; margin-bottom:8px;">
+                  <span style="color:#888; width:50px; flex-shrink:0;">주소</span>
+                  <span style="color:#666;">${worker.location.addressString || '-'}</span>
+                </div>
+              </div>
+              <div style="text-align:center;">
+                 <a href="tel:${worker.phone}" style="display:block; width:100%; padding:8px 0; background:#2563eb; color:white; text-decoration:none; border-radius:6px; font-size:13px; font-weight:bold; transition: background 0.2s;">
+                   <i class="fas fa-phone-alt" style="margin-right:4px;"></i> 전화걸기
+                 </a>
+              </div>
             </div>
           `;
 
           const infowindow = new kakao.maps.InfoWindow({
             content: content,
+            removable: true
           });
 
           kakao.maps.event.addListener(marker, 'click', function() {

@@ -11,6 +11,8 @@ import LocationPickerMap from './LocationPickerMap';
 
 interface RegistrationFormProps {
   user: User;
+  onCancel?: () => void;
+  onSuccess?: () => void;
 }
 
 declare global {
@@ -19,7 +21,7 @@ declare global {
   }
 }
 
-const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
+const RegistrationForm: React.FC<RegistrationFormProps> = ({ user, onCancel, onSuccess }) => {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(true);
@@ -410,6 +412,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
       }));
 
       setIsSubmitted(true);
+      if (onSuccess) onSuccess();
     } catch (error: any) {
       console.error("Error writing document: ", error);
       alert(`저장 중 오류가 발생했습니다: ${error.message}`);
@@ -423,7 +426,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
     return <div className="p-8 text-center text-gray-500"><i className="fas fa-spinner fa-spin mr-2"></i>정보를 불러오는 중...</div>;
   }
 
-  if (isSubmitted) {
+  if (isSubmitted && !onSuccess) {
     return (
       <div className="bg-white rounded-2xl shadow-lg p-8 text-center animate-fade-in-up">
         <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -445,7 +448,18 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
+      {/* Cancel Button if props exist */}
+      {onCancel && (
+          <button 
+            type="button" 
+            onClick={onCancel} 
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-20 p-2"
+          >
+              <i className="fas fa-times text-xl"></i>
+          </button>
+      )}
+
       {/* Progress Bar */}
       <div className="w-full bg-gray-100 h-1.5">
         <div 
@@ -764,8 +778,8 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user }) => {
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-paper-plane"></i>
-                    {isSubmitted ? '수정 완료' : '등록 완료'}
+                    <i className="fas fa-save"></i>
+                    저장하기
                   </>
                 )}
               </button>
