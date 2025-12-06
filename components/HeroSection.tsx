@@ -20,13 +20,13 @@ const HeroSection: React.FC = () => {
           
           {/* Text Content */}
           <div className="text-center md:text-left max-w-2xl">
-            <div className="inline-flex items-center gap-2 bg-brand-600/90 text-white px-3 py-1 rounded-full text-xs font-bold mb-4 shadow-lg shadow-brand-900/50 backdrop-blur-sm border border-brand-400/30">
+            <div className="inline-flex items-center gap-2 bg-brand-600/90 text-white px-3 py-1 rounded-full text-xs font-bold mb-4 shadow-lg shadow-brand-900/50 backdrop-blur-sm border border-blue-400/30">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
               성주 지역 최대 인력 보유
             </div>
             
             <h1 className="text-3xl md:text-5xl font-extrabold text-white leading-tight mb-4 tracking-tight drop-shadow-lg">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-200 to-white">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-white">
                 건설 · 공장 · 농촌
               </span><br/>
               인력 확실하게 공급합니다!
@@ -40,15 +40,15 @@ const HeroSection: React.FC = () => {
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-3 gap-2 md:gap-6 border-t border-slate-700/50 pt-6">
               <div className="text-center md:text-left">
-                <div className="text-2xl md:text-3xl font-bold text-white">500<span className="text-brand-400 text-lg">+</span></div>
+                <div className="text-2xl md:text-3xl font-bold text-white">500<span className="text-blue-400 text-lg">+</span></div>
                 <div className="text-[10px] md:text-xs text-slate-400">보유 인력</div>
               </div>
               <div className="text-center md:text-left border-l border-slate-700/50 pl-2 md:pl-6">
-                <div className="text-2xl md:text-3xl font-bold text-white">100<span className="text-brand-400 text-lg">%</span></div>
+                <div className="text-2xl md:text-3xl font-bold text-white">100<span className="text-blue-400 text-lg">%</span></div>
                 <div className="text-[10px] md:text-xs text-slate-400">현장 배치율</div>
               </div>
               <div className="text-center md:text-left border-l border-slate-700/50 pl-2 md:pl-6">
-                <div className="text-2xl md:text-3xl font-bold text-white">24<span className="text-brand-400 text-lg">h</span></div>
+                <div className="text-2xl md:text-3xl font-bold text-white">24<span className="text-blue-400 text-lg">h</span></div>
                 <div className="text-[10px] md:text-xs text-slate-400">상시 대기</div>
               </div>
             </div>
