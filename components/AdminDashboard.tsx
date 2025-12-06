@@ -796,12 +796,16 @@ const AdminDashboard: React.FC = () => {
                            <div>
                                <label className="text-xs text-gray-500 mb-1 block font-bold">신분증</label>
                                <input type="file" accept="image/*" onChange={(e) => handleNewFileChange(e, 'idCard')} className="hidden" id="adminIdUpload" />
-                               <label htmlFor="adminIdUpload" className="block w-full text-center py-2 border border-dashed rounded-lg text-xs cursor-pointer bg-white">{newFiles.idCard ? '선택됨' : '+ 추가'}</label>
+                               <label htmlFor="adminIdUpload" className="block w-full text-center py-2 border border-dashed rounded-lg text-xs cursor-pointer bg-white break-words px-1">
+                                 {newFiles.idCard ? newFiles.idCard.name : '+ 추가'}
+                               </label>
                            </div>
                            <div>
                                <label className="text-xs text-gray-500 mb-1 block font-bold">이수증</label>
                                <input type="file" accept="image/*" onChange={(e) => handleNewFileChange(e, 'safetyCert')} className="hidden" id="adminSafeUpload" />
-                               <label htmlFor="adminSafeUpload" className="block w-full text-center py-2 border border-dashed rounded-lg text-xs cursor-pointer bg-white">{newFiles.safetyCert ? '선택됨' : '+ 추가'}</label>
+                               <label htmlFor="adminSafeUpload" className="block w-full text-center py-2 border border-dashed rounded-lg text-xs cursor-pointer bg-white break-words px-1">
+                                 {newFiles.safetyCert ? newFiles.safetyCert.name : '+ 추가'}
+                               </label>
                            </div>
                       </div>
 
@@ -843,6 +847,44 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <textarea name="introduction" value={editForm.introduction} onChange={handleEditChange} className="w-full border p-2 rounded text-sm" rows={2} />
                     
+                    {/* EDIT FILES SECTION */}
+                    <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                         <div>
+                             <label className="text-xs text-gray-500 mb-1 block font-bold">신분증</label>
+                             <input type="file" accept="image/*" onChange={(e) => handleEditFileChange(e, 'idCard')} className="hidden" id={`editIdCard_${worker.id}`} />
+                             <label htmlFor={`editIdCard_${worker.id}`} className="flex flex-col items-center justify-center p-2 border border-dashed border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 transition-colors h-20">
+                                 {editFiles.idCard ? (
+                                     <span className="text-xs text-brand-600 font-bold text-center break-all">{editFiles.idCard.name}</span>
+                                 ) : (
+                                     <>
+                                        <i className={`fas ${editForm.idCardImageUrl ? 'fa-check text-green-500' : 'fa-plus text-gray-400'} mb-1`}></i>
+                                        <span className="text-[10px] text-gray-500">{editForm.idCardImageUrl ? '변경하기' : '등록'}</span>
+                                     </>
+                                 )}
+                             </label>
+                             {editForm.idCardImageUrl && !editFiles.idCard && (
+                                 <a href={editForm.idCardImageUrl} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 underline block text-center mt-1">기존 이미지 보기</a>
+                             )}
+                         </div>
+                         <div>
+                             <label className="text-xs text-gray-500 mb-1 block font-bold">이수증</label>
+                             <input type="file" accept="image/*" onChange={(e) => handleEditFileChange(e, 'safetyCert')} className="hidden" id={`editSafetyCert_${worker.id}`} />
+                             <label htmlFor={`editSafetyCert_${worker.id}`} className="flex flex-col items-center justify-center p-2 border border-dashed border-gray-300 rounded-lg bg-white cursor-pointer hover:bg-gray-50 transition-colors h-20">
+                                 {editFiles.safetyCert ? (
+                                     <span className="text-xs text-brand-600 font-bold text-center break-all">{editFiles.safetyCert.name}</span>
+                                 ) : (
+                                     <>
+                                        <i className={`fas ${editForm.safetyCertImageUrl ? 'fa-check text-green-500' : 'fa-plus text-gray-400'} mb-1`}></i>
+                                        <span className="text-[10px] text-gray-500">{editForm.safetyCertImageUrl ? '변경하기' : '등록'}</span>
+                                     </>
+                                 )}
+                             </label>
+                             {editForm.safetyCertImageUrl && !editFiles.safetyCert && (
+                                 <a href={editForm.safetyCertImageUrl} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 underline block text-center mt-1">기존 이미지 보기</a>
+                             )}
+                         </div>
+                    </div>
+
                     <div className="flex gap-2 pt-2">
                       <button onClick={cancelEdit} className="flex-1 bg-gray-100 py-2 rounded-lg text-sm font-bold">취소</button>
                       <button onClick={saveEdit} className="flex-1 bg-brand-600 text-white py-2 rounded-lg text-sm font-bold">저장</button>
