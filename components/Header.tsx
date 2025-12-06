@@ -12,10 +12,10 @@ interface HeaderProps {
   onToggleAdmin?: () => void;
   isAdminView?: boolean;
   onLoginClick?: () => void;
-  onProfileClick?: () => void;
-  isProfileView?: boolean;
-  onGalleryClick?: () => void;
-  isGalleryView?: boolean;
+  
+  // Refactored props for unified navigation
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 declare global {
@@ -30,10 +30,8 @@ const Header: React.FC<HeaderProps> = ({
   onToggleAdmin, 
   isAdminView, 
   onLoginClick, 
-  onProfileClick, 
-  isProfileView,
-  onGalleryClick,
-  isGalleryView
+  activeTab,
+  onTabChange
 }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNoti, setShowNoti] = useState(false);
@@ -88,15 +86,8 @@ const Header: React.FC<HeaderProps> = ({
 
   const handleInstallClick = async () => {
     if (!installPrompt) return;
-    
-    // Show the install prompt
     installPrompt.prompt();
-    
-    // Wait for the user to respond to the prompt
     const { outcome } = await installPrompt.userChoice;
-    console.log(`User response to the install prompt: ${outcome}`);
-    
-    // We've used the prompt, and can't use it again, throw it away
     if (outcome === 'accepted') {
         setInstallPrompt(null);
         window.deferredPrompt = null;
@@ -133,14 +124,12 @@ const Header: React.FC<HeaderProps> = ({
     const unsub = onSnapshot(doc(db, 'workers', user.uid), (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data() as WorkerProfile;
-            // If setting exists, use it. If not (old account), default to true.
             if (data.notificationSettings?.jobPostings !== undefined) {
                 setAllowJobNotifications(data.notificationSettings.jobPostings);
             } else {
                 setAllowJobNotifications(true);
             }
         } else {
-            // No profile yet, default to true
             setAllowJobNotifications(true);
         }
     });
@@ -152,15 +141,7 @@ const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     if (!user) return;
 
-    // Check Notification Permission on login
-    if ("Notification" in window && Notification.permission === "default") {
-        // We do not force requestPermission here to avoid annoying the user.
-        // It is handled in RegistrationForm when they opt-in.
-    }
-
     const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(20));
-    
-    // Reset first load flag when user changes (re-login)
     isFirstLoad.current = true;
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -169,32 +150,27 @@ const Header: React.FC<HeaderProps> = ({
 
       // --- Push Notification Logic ---
       if (!isFirstLoad.current) {
-        // Check specifically for newly added documents
         for (const change of snapshot.docChanges()) {
           if (change.type === 'added') {
             const newNoti = change.doc.data() as AppNotification;
             
-            // Check User Setting: if it's a job notification and user disabled it, skip.
             if (newNoti.type === 'job' && !allowJobNotifications) {
                 continue;
             }
 
-            // 1. Browser System Notification
-            // Use ServiceWorkerRegistration.showNotification() for better mobile support
             if ("Notification" in window && Notification.permission === "granted") {
               try {
                   const registration = await navigator.serviceWorker.ready;
                   if (registration) {
                       registration.showNotification(newNoti.title, {
                           body: newNoti.message,
-                          icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Using the icon from manifest
+                          icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
                           badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
                           vibrate: [200, 100, 200],
                           tag: 'job-alert',
-                          data: { url: '/' } // Used by sw 'notificationclick'
+                          data: { url: '/' }
                       } as any);
                   } else {
-                      // Fallback if no SW ready
                        new Notification(newNoti.title, {
                           body: newNoti.message,
                           icon: '/vite.svg',
@@ -205,26 +181,21 @@ const Header: React.FC<HeaderProps> = ({
               }
             }
 
-            // 2. In-App Toast
             setToast({
               visible: true,
               title: newNoti.title,
               message: newNoti.message
             });
 
-            // Auto-hide toast after 4 seconds
             setTimeout(() => {
               setToast(prev => ({ ...prev, visible: false }));
             }, 4000);
           }
         }
       } else {
-        // After first execution, mark as loaded so future updates trigger notifications
         isFirstLoad.current = false;
       }
-      // -------------------------------
 
-      // 읽지 않은 알림 체크 (Badge Logic)
       const lastReadTime = localStorage.getItem('lastReadNotiTime');
       if (list.length > 0) {
         if (!lastReadTime || new Date(list[0].createdAt) > new Date(lastReadTime)) {
@@ -290,8 +261,13 @@ const Header: React.FC<HeaderProps> = ({
   const handleLogout = () => {
     if (window.confirm('로그아웃 하시겠습니까?')) {
       auth.signOut();
-      window.location.href = "/"; // Force simple reload/redirect
+      window.location.href = "/"; 
     }
+  };
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (onTabChange) onTabChange('home');
   };
 
   return (
@@ -299,7 +275,7 @@ const Header: React.FC<HeaderProps> = ({
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <a href="/" onClick={handleLogoClick} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm shadow-brand-200">
                 젊
               </div>
@@ -315,17 +291,35 @@ const Header: React.FC<HeaderProps> = ({
           
           <div className="flex items-center gap-2">
             
-            <button
-                onClick={onGalleryClick}
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                  isGalleryView
-                  ? 'bg-brand-600 text-white shadow-md'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                aria-label="현장 갤러리"
-            >
-                <i className="fas fa-images"></i>
-            </button>
+            {/* Desktop Navigation (Hidden on Mobile) */}
+            <div className="hidden md:flex items-center gap-1 mr-2">
+                <button
+                    onClick={() => onTabChange?.('jobs')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                    activeTab === 'jobs' ? 'text-brand-600 bg-brand-50' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    일자리
+                </button>
+                <button
+                    onClick={() => onTabChange?.('gallery')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                    activeTab === 'gallery' ? 'text-brand-600 bg-brand-50' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                    갤러리
+                </button>
+                {user && (
+                    <button
+                        onClick={() => onTabChange?.('register')}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                        activeTab === 'register' ? 'text-brand-600 bg-brand-50' : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                    >
+                        내정보
+                    </button>
+                )}
+            </div>
 
              {isAdmin && (
               <button
@@ -344,27 +338,12 @@ const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={handleInstallClick}
                 className="px-3 py-1.5 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200 flex items-center gap-1 hidden sm:flex"
-                aria-label="앱 설치"
               >
                 <i className="fas fa-download text-xs"></i>
                 <span className="hidden sm:inline text-xs">앱 설치</span>
               </button>
             )}
             
-            {user && (
-              <button
-                onClick={onProfileClick}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1 ${
-                    isProfileView 
-                    ? 'bg-brand-600 text-white shadow-md' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                  <i className="fas fa-user"></i>
-                  <span className="hidden sm:inline">내 정보</span>
-              </button>
-            )}
-
             <button 
               onClick={handleShare}
               className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 transition-colors"
@@ -422,7 +401,6 @@ const Header: React.FC<HeaderProps> = ({
                                 <button 
                                     onClick={(e) => handleDeleteNoti(e, noti.id)}
                                     className="absolute top-3 right-3 text-gray-300 hover:text-red-500 p-1 transition-colors"
-                                    aria-label="삭제"
                                 >
                                     <i className="fas fa-times text-sm"></i>
                                 </button>
