@@ -9,6 +9,7 @@ import AdminDashboard from './components/AdminDashboard';
 import JobBoard from './components/JobBoard';
 import WorkerTicker from './components/WorkerTicker';
 import MyProfile from './components/MyProfile';
+import Gallery from './components/Gallery';
 import { BUSINESS_INFO, ADMIN_EMAIL } from './constants';
 import { auth } from './services/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -20,6 +21,7 @@ function App() {
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -53,18 +55,27 @@ function App() {
 
   const toggleAdminView = () => {
     setShowAdminDashboard(prev => !prev);
-    // If opening admin, close profile
-    if (!showAdminDashboard) setShowProfile(false);
+    if (!showAdminDashboard) {
+        setShowProfile(false);
+        setShowGallery(false);
+    }
   };
 
   const toggleProfileView = () => {
       setShowProfile(prev => !prev);
-      // If opening profile, close admin
-      if (!showProfile) setShowAdminDashboard(false);
+      if (!showProfile) {
+          setShowAdminDashboard(false);
+          setShowGallery(false);
+      }
   };
 
-  // Reset logic when clicking Home logo (which simply reloads currently in Header, but if we SPA it later):
-  // For now Header 'home' is href="/" which reloads.
+  const toggleGalleryView = () => {
+      setShowGallery(prev => !prev);
+      if (!showGallery) {
+          setShowAdminDashboard(false);
+          setShowProfile(false);
+      }
+  };
 
   if (loading) {
     return (
@@ -89,6 +100,8 @@ function App() {
         onLoginClick={() => setShowAuthModal(true)}
         onProfileClick={toggleProfileView}
         isProfileView={showProfile}
+        onGalleryClick={toggleGalleryView}
+        isGalleryView={showGallery}
       />
       
       {/* Main Container: Expanded for PC (max-w-7xl) */}
@@ -97,6 +110,8 @@ function App() {
           <div className="p-4"><AdminDashboard /></div>
         ) : showProfile && user ? (
           <div className="p-4"><MyProfile user={user} /></div>
+        ) : showGallery ? (
+          <div className="p-4"><Gallery isAdmin={isAdmin} /></div>
         ) : (
           <div className="flex flex-col gap-0 md:gap-8">
             <div className="px-4 md:px-0 pt-6 md:pt-0">

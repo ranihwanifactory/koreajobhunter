@@ -1,5 +1,4 @@
 
-
 export enum JobType {
   CONSTRUCTION = '건설/현장',
   CARPENTER = '목수/목공',
@@ -72,4 +71,11 @@ export interface AppNotification {
   createdAt: string;
   type: 'job' | 'notice';
   linkId?: string;
+}
+
+export interface GalleryPhoto {
+  id: string;
+  imageUrl: string;
+  description: string;
+  uploadedAt: string;
 }

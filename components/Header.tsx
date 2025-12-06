@@ -14,6 +14,8 @@ interface HeaderProps {
   onLoginClick?: () => void;
   onProfileClick?: () => void;
   isProfileView?: boolean;
+  onGalleryClick?: () => void;
+  isGalleryView?: boolean;
 }
 
 declare global {
@@ -22,7 +24,17 @@ declare global {
   }
 }
 
-const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminView, onLoginClick, onProfileClick, isProfileView }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  user, 
+  isAdmin, 
+  onToggleAdmin, 
+  isAdminView, 
+  onLoginClick, 
+  onProfileClick, 
+  isProfileView,
+  onGalleryClick,
+  isGalleryView
+}) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNoti, setShowNoti] = useState(false);
   const [hasNew, setHasNew] = useState(false);
@@ -302,6 +314,19 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
           </div>
           
           <div className="flex items-center gap-2">
+            
+            <button
+                onClick={onGalleryClick}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                  isGalleryView
+                  ? 'bg-brand-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                aria-label="현장 갤러리"
+            >
+                <i className="fas fa-images"></i>
+            </button>
+
              {isAdmin && (
               <button
                 onClick={onToggleAdmin}
@@ -318,7 +343,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
             {installPrompt && (
               <button
                 onClick={handleInstallClick}
-                className="px-3 py-1.5 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200 flex items-center gap-1"
+                className="px-3 py-1.5 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200 flex items-center gap-1 hidden sm:flex"
                 aria-label="앱 설치"
               >
                 <i className="fas fa-download text-xs"></i>
