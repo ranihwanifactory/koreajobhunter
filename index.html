@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
   <head>
@@ -36,7 +37,7 @@
               },
               fadeInUp: {
                 '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
+                '100%': { opacity: '1' },
               },
               marquee: {
                 '0%': { transform: 'translateX(0%)' },
@@ -82,16 +83,15 @@
   <body>
     <div id="root"></div>
     <script>
-      // PWA Install Prompt Logic
-      let deferredPrompt;
+      // Global logic to capture the install prompt early
+      window.deferredPrompt = null;
       window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
         e.preventDefault();
-        deferredPrompt = e;
-        // Show install button or hint if needed globally
-        // For this app, we rely on the Header button, but we can try to prompt if user interacts
+        // Stash the event so it can be triggered later.
+        window.deferredPrompt = e;
+        console.log('beforeinstallprompt captured');
       });
-
-      // Try to auto-install (Browsers often block this without interaction, but we can try via logic in App)
     </script>
   <script type="module" src="/index.tsx"></script>
 </body>

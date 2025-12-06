@@ -14,12 +14,21 @@ interface HeaderProps {
   onLoginClick?: () => void;
 }
 
+declare global {
+  interface Window {
+    deferredPrompt: any;
+  }
+}
+
 const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminView, onLoginClick }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNoti, setShowNoti] = useState(false);
   const [hasNew, setHasNew] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const notiRef = useRef<HTMLDivElement>(null);
+  
+  // Install Prompt State
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
   
   // User settings (default: receive notifications)
   const [allowJobNotifications, setAllowJobNotifications] = useState(true);
@@ -33,6 +42,52 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
   
   // Ref to track if it's the initial data load
   const isFirstLoad = useRef(true);
+
+  // Install PWA Logic
+  useEffect(() => {
+    // Check if event was captured before component mount
+    if (window.deferredPrompt) {
+      setInstallPrompt(window.deferredPrompt);
+    }
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      window.deferredPrompt = e;
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Also check for 'appinstalled' event
+    const handleAppInstalled = () => {
+      setInstallPrompt(null);
+      window.deferredPrompt = null;
+      console.log('PWA installed');
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    
+    // Show the install prompt
+    installPrompt.prompt();
+    
+    // Wait for the user to respond to the prompt
+    const { outcome } = await installPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    
+    // We've used the prompt, and can't use it again, throw it away
+    if (outcome === 'accepted') {
+        setInstallPrompt(null);
+        window.deferredPrompt = null;
+    }
+  };
 
   // Load dismissed notifications from local storage
   useEffect(() => {
@@ -240,6 +295,17 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
                 }`}
               >
                 {isAdminView ? '사용자모드' : '관리자모드'}
+              </button>
+            )}
+
+            {installPrompt && (
+              <button
+                onClick={handleInstallClick}
+                className="px-3 py-1.5 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200 flex items-center gap-1"
+                aria-label="앱 설치"
+              >
+                <i className="fas fa-download text-xs"></i>
+                <span className="hidden sm:inline text-xs">앱 설치</span>
               </button>
             )}
 
