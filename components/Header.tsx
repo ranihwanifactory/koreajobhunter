@@ -16,6 +16,9 @@ interface HeaderProps {
   // Refactored props for unified navigation
   activeTab?: string;
   onTabChange?: (tab: string) => void;
+
+  // Notification click handler
+  onNotificationClick?: (notification: AppNotification) => void;
 }
 
 declare global {
@@ -31,7 +34,8 @@ const Header: React.FC<HeaderProps> = ({
   isAdminView, 
   onLoginClick, 
   activeTab,
-  onTabChange
+  onTabChange,
+  onNotificationClick
 }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNoti, setShowNoti] = useState(false);
@@ -46,10 +50,11 @@ const Header: React.FC<HeaderProps> = ({
   const [allowJobNotifications, setAllowJobNotifications] = useState(true);
 
   // State for In-App Toast Notification
-  const [toast, setToast] = useState<{ visible: boolean; title: string; message: string }>({
+  const [toast, setToast] = useState<{ visible: boolean; title: string; message: string; data?: AppNotification }>({
     visible: false,
     title: '',
-    message: ''
+    message: '',
+    data: undefined
   });
   
   // Ref to track if it's the initial data load
@@ -168,7 +173,7 @@ const Header: React.FC<HeaderProps> = ({
                           badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
                           vibrate: [200, 100, 200],
                           tag: 'job-alert',
-                          data: { url: '/' }
+                          data: { url: '/', linkId: newNoti.linkId } // Pass data for SW click handling if needed
                       } as any);
                   } else {
                        new Notification(newNoti.title, {
@@ -184,7 +189,8 @@ const Header: React.FC<HeaderProps> = ({
             setToast({
               visible: true,
               title: newNoti.title,
-              message: newNoti.message
+              message: newNoti.message,
+              data: newNoti
             });
 
             setTimeout(() => {
@@ -228,6 +234,13 @@ const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const handleItemClick = (noti: AppNotification) => {
+    if (onNotificationClick) {
+      onNotificationClick(noti);
+    }
+    setShowNoti(false);
+  };
+
   const handleDeleteNoti = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const newIds = [...dismissedIds, id];
@@ -268,6 +281,13 @@ const Header: React.FC<HeaderProps> = ({
   const handleLogoClick = (e: React.MouseEvent) => {
       e.preventDefault();
       if (onTabChange) onTabChange('home');
+  };
+
+  const handleToastClick = () => {
+    if (toast.data && onNotificationClick) {
+      onNotificationClick(toast.data);
+    }
+    setToast(prev => ({ ...prev, visible: false }));
   };
 
   return (
@@ -386,7 +406,11 @@ const Header: React.FC<HeaderProps> = ({
                       ) : (
                         <ul className="divide-y divide-gray-100">
                           {visibleNotifications.map((noti) => (
-                            <li key={noti.id} className="p-4 hover:bg-gray-50 transition-colors relative group">
+                            <li 
+                                key={noti.id} 
+                                onClick={() => handleItemClick(noti)}
+                                className="p-4 hover:bg-gray-50 transition-colors relative group cursor-pointer"
+                            >
                               <div className="flex items-start gap-3">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${noti.type === 'job' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
                                   <i className={`fas ${noti.type === 'job' ? 'fa-briefcase' : 'fa-info-circle'} text-xs`}></i>
@@ -437,7 +461,10 @@ const Header: React.FC<HeaderProps> = ({
       
       {/* In-App Toast Notification */}
       {toast.visible && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-brand-100 p-4 animate-fade-in-up flex items-start gap-4 ring-1 ring-brand-500/20">
+        <div 
+          onClick={handleToastClick}
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-brand-100 p-4 animate-fade-in-up flex items-start gap-4 ring-1 ring-brand-500/20 cursor-pointer hover:bg-gray-50 transition-colors"
+        >
           <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
              <i className="fas fa-bell ring-4 ring-brand-50 rounded-full animate-pulse"></i>
           </div>
@@ -446,7 +473,7 @@ const Header: React.FC<HeaderProps> = ({
              <p className="text-gray-600 text-xs leading-relaxed line-clamp-2">{toast.message}</p>
           </div>
           <button 
-            onClick={() => setToast(prev => ({ ...prev, visible: false }))}
+            onClick={(e) => { e.stopPropagation(); setToast(prev => ({ ...prev, visible: false })); }}
             className="text-gray-400 hover:text-gray-600"
           >
             <i className="fas fa-times"></i>

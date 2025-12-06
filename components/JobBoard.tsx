@@ -4,7 +4,12 @@ import { db } from '../services/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { JobPosting } from '../types';
 
-const JobBoard: React.FC = () => {
+interface JobBoardProps {
+  targetJobId?: string | null;
+  onTargetJobConsumed?: () => void;
+}
+
+const JobBoard: React.FC<JobBoardProps> = ({ targetJobId, onTargetJobConsumed }) => {
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<JobPosting | null>(null);
@@ -26,6 +31,18 @@ const JobBoard: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  // Deep link effect: Open modal if targetJobId is provided
+  useEffect(() => {
+    if (targetJobId && jobs.length > 0) {
+      const target = jobs.find(j => j.id === targetJobId);
+      if (target) {
+        setSelectedJob(target);
+        // Clean up the target ID in parent so it doesn't reopen if we close it and switch tabs
+        if (onTargetJobConsumed) onTargetJobConsumed();
+      }
+    }
+  }, [targetJobId, jobs, onTargetJobConsumed]);
 
   const handleJobClick = (job: JobPosting) => {
     setSelectedJob(job);

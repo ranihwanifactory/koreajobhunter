@@ -15,6 +15,7 @@ import BottomNav from './components/BottomNav';
 import { BUSINESS_INFO, ADMIN_EMAIL } from './constants';
 import { auth } from './services/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { AppNotification } from './types';
 
 type TabView = 'home' | 'jobs' | 'register' | 'gallery';
 
@@ -27,6 +28,8 @@ function App() {
   
   // Tab State for Mobile App-like navigation
   const [activeTab, setActiveTab] = useState<TabView>('home');
+  // State for deep linking to a specific job from notification
+  const [targetJobId, setTargetJobId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -69,6 +72,16 @@ function App() {
       }
       setActiveTab(tab as TabView);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleNotificationClick = (noti: AppNotification) => {
+      if (noti.type === 'job' && noti.linkId) {
+          // Navigate to jobs tab
+          setActiveTab('jobs');
+          // Set target job to open modal
+          setTargetJobId(noti.linkId);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
   };
 
   if (loading) {
@@ -150,7 +163,10 @@ function App() {
         case 'jobs':
             return (
                 <div className="px-4 md:px-0 py-6">
-                    <JobBoard />
+                    <JobBoard 
+                        targetJobId={targetJobId} 
+                        onTargetJobConsumed={() => setTargetJobId(null)}
+                    />
                 </div>
             );
         case 'gallery':
@@ -214,6 +230,8 @@ function App() {
         // Map header interactions to tab changes
         activeTab={activeTab}
         onTabChange={handleTabChange}
+        // Notification click handler
+        onNotificationClick={handleNotificationClick}
       />
       
       {/* Main Container */}
