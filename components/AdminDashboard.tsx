@@ -15,7 +15,12 @@ const AdminDashboard: React.FC = () => {
   // --- Worker Management States ---
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
   const [workerLoading, setWorkerLoading] = useState(false);
+  
+  // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterJobType, setFilterJobType] = useState<string>(''); // '' = All
+  const [filterLocation, setFilterLocation] = useState('');
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<WorkerProfile>>({});
   const [editFiles, setEditFiles] = useState<{idCard?: File, safetyCert?: File}>({});
@@ -501,11 +506,21 @@ const AdminDashboard: React.FC = () => {
       }
   };
 
-  const filteredWorkers = workers.filter(worker => 
-    worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    worker.phone.includes(searchTerm) ||
-    worker.introduction.includes(searchTerm)
-  );
+  const filteredWorkers = workers.filter(worker => {
+    // 1. Text Search (Name, Phone, Intro)
+    const matchesSearch = 
+      worker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      worker.phone.includes(searchTerm) ||
+      (worker.introduction || '').includes(searchTerm);
+
+    // 2. Job Type Filter
+    const matchesJob = filterJobType === '' || worker.desiredJobs?.includes(filterJobType as JobType);
+
+    // 3. Location Filter
+    const matchesLocation = filterLocation === '' || (worker.location?.addressString || '').includes(filterLocation);
+
+    return matchesSearch && matchesJob && matchesLocation;
+  });
 
 
   // =================================================================
@@ -665,16 +680,60 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
               
-              <div className="relative w-full">
-                <input
-                  type="text"
-                  placeholder="이름/번호 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white outline-none focus:border-brand-500 text-sm"
-                />
-                <i className="fas fa-search absolute left-3.5 top-3.5 text-gray-400"></i>
+              {/* Search & Filter Group */}
+              <div className="space-y-3">
+                {/* 1. Main Search */}
+                <div className="relative w-full group">
+                    <input
+                        type="text"
+                        placeholder="이름, 연락처 또는 소개 검색..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white text-sm outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all placeholder:text-gray-400"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i className="fas fa-search text-gray-400 group-focus-within:text-brand-500 transition-colors"></i>
+                    </div>
+                </div>
+
+                {/* 2. Detail Filters */}
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Job Type */}
+                    <div className="relative group">
+                        <select
+                            value={filterJobType}
+                            onChange={(e) => setFilterJobType(e.target.value)}
+                            className="w-full pl-10 pr-8 py-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 appearance-none cursor-pointer transition-all hover:border-brand-300"
+                        >
+                            <option value="">전체 직종</option>
+                            {JOB_TYPES_LIST.map(job => (
+                                <option key={job.value} value={job.value}>{job.label}</option>
+                            ))}
+                        </select>
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <i className="fas fa-briefcase text-gray-400 group-focus-within:text-brand-500 transition-colors"></i>
+                        </div>
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <i className="fas fa-chevron-down text-gray-400 text-xs"></i>
+                        </div>
+                    </div>
+
+                    {/* Location */}
+                    <div className="relative group">
+                        <input
+                            type="text"
+                            placeholder="지역 (읍/면/동)"
+                            value={filterLocation}
+                            onChange={(e) => setFilterLocation(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 transition-all hover:border-brand-300"
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                            <i className="fas fa-map-marker-alt text-gray-400 group-focus-within:text-brand-500 transition-colors"></i>
+                        </div>
+                    </div>
+                </div>
               </div>
+
             </div>
           </div>
           
