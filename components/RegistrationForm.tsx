@@ -122,12 +122,29 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user, onCancel, onS
     });
   };
 
-  const toggleNotification = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const toggleNotification = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = e.target.checked;
+    
+    // Request permission if checking the box
+    if (isChecked) {
+      if (!("Notification" in window)) {
+        alert("이 브라우저는 알림을 지원하지 않습니다.");
+        return;
+      }
+      
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert("알림 권한이 거부되었습니다. 브라우저 설정에서 알림을 허용해주세요.");
+        // Do not verify the checkbox visually if permission denied
+        return;
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       notificationSettings: {
         ...prev.notificationSettings,
-        jobPostings: e.target.checked
+        jobPostings: isChecked
       }
     }));
   };

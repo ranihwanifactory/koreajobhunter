@@ -140,9 +140,10 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
   useEffect(() => {
     if (!user) return;
 
-    // Request Notification Permission on login
+    // Check Notification Permission on login
     if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+        // We do not force requestPermission here to avoid annoying the user.
+        // It is handled in RegistrationForm when they opt-in.
     }
 
     const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(20));
@@ -150,30 +151,43 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
     // Reset first load flag when user changes (re-login)
     isFirstLoad.current = true;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppNotification));
       setNotifications(list);
 
       // --- Push Notification Logic ---
       if (!isFirstLoad.current) {
         // Check specifically for newly added documents
-        snapshot.docChanges().forEach((change) => {
+        for (const change of snapshot.docChanges()) {
           if (change.type === 'added') {
             const newNoti = change.doc.data() as AppNotification;
             
             // Check User Setting: if it's a job notification and user disabled it, skip.
             if (newNoti.type === 'job' && !allowJobNotifications) {
-                return;
+                continue;
             }
 
             // 1. Browser System Notification
+            // Use ServiceWorkerRegistration.showNotification() for better mobile support
             if ("Notification" in window && Notification.permission === "granted") {
               try {
-                new Notification(newNoti.title, {
-                  body: newNoti.message,
-                  icon: '/vite.svg', // Ensure this path exists or remove icon property
-                  tag: 'job-alert'
-                });
+                  const registration = await navigator.serviceWorker.ready;
+                  if (registration) {
+                      registration.showNotification(newNoti.title, {
+                          body: newNoti.message,
+                          icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Using the icon from manifest
+                          badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                          vibrate: [200, 100, 200],
+                          tag: 'job-alert',
+                          data: { url: '/' } // Used by sw 'notificationclick'
+                      } as any);
+                  } else {
+                      // Fallback if no SW ready
+                       new Notification(newNoti.title, {
+                          body: newNoti.message,
+                          icon: '/vite.svg',
+                      });
+                  }
               } catch (e) {
                 console.error("Notification trigger failed", e);
               }
@@ -191,7 +205,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
               setToast(prev => ({ ...prev, visible: false }));
             }, 4000);
           }
-        });
+        }
       } else {
         // After first execution, mark as loaded so future updates trigger notifications
         isFirstLoad.current = false;
@@ -208,7 +222,7 @@ const Header: React.FC<HeaderProps> = ({ user, isAdmin, onToggleAdmin, isAdminVi
     });
 
     return () => unsubscribe();
-  }, [user, allowJobNotifications]); // Added allowJobNotifications dependency to refresh if logic needs it, though mostly used inside callback
+  }, [user, allowJobNotifications]);
 
   // 외부 클릭 시 닫기
   useEffect(() => {

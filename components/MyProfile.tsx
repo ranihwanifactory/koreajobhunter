@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
 import { db } from '../services/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { WorkerProfile } from '../types';
 import RegistrationForm from './RegistrationForm';
 
@@ -26,6 +26,38 @@ const MyProfile: React.FC<MyProfileProps> = ({ user }) => {
     });
     return () => unsub();
   }, [user]);
+
+  const handleNotificationToggle = async () => {
+    if (!profile || !user) return;
+    
+    // Default to true if undefined, consistent with Header logic
+    const currentSetting = profile.notificationSettings?.jobPostings ?? true;
+    const newSetting = !currentSetting;
+
+    // If turning on, request permission
+    if (newSetting) {
+      if (!("Notification" in window)) {
+        alert("이 브라우저는 알림을 지원하지 않습니다.");
+        return;
+      }
+      
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert("알림 권한이 거부되었습니다. 브라우저 설정에서 알림을 허용해주세요.");
+        return; 
+      }
+    }
+
+    try {
+        const workerRef = doc(db, 'workers', user.uid);
+        await updateDoc(workerRef, {
+            'notificationSettings.jobPostings': newSetting
+        });
+    } catch (e) {
+        console.error("Error updating notification settings:", e);
+        alert("설정 변경 중 오류가 발생했습니다.");
+    }
+  };
 
   if (loading) {
     return <div className="p-8 text-center text-gray-500"><i className="fas fa-spinner fa-spin mr-2"></i>프로필 불러오는 중...</div>;
@@ -66,6 +98,8 @@ const MyProfile: React.FC<MyProfileProps> = ({ user }) => {
     );
   }
 
+  const isNotiEnabled = profile.notificationSettings?.jobPostings ?? true;
+
   return (
     <div className="animate-fade-in max-w-2xl mx-auto">
        <div className="flex items-center justify-between mb-4 px-1">
@@ -94,11 +128,6 @@ const MyProfile: React.FC<MyProfileProps> = ({ user }) => {
                    <span className="bg-blue-50 text-blue-600 text-xs px-2 py-1 rounded border border-blue-100">
                       <i className="fas fa-phone-alt mr-1"></i> {profile.phone}
                    </span>
-                   {profile.notificationSettings?.jobPostings && (
-                       <span className="bg-green-50 text-green-600 text-xs px-2 py-1 rounded border border-green-100">
-                           <i className="fas fa-bell mr-1"></i> 알림 받는 중
-                       </span>
-                   )}
                 </div>
              </div>
           </div>
@@ -153,6 +182,34 @@ const MyProfile: React.FC<MyProfileProps> = ({ user }) => {
                         "{profile.introduction || '작성된 소개가 없습니다.'}"
                     </div>
                  </div>
+             </div>
+
+             <hr className="border-gray-50" />
+
+             {/* App Settings (Notification) */}
+             <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">앱 설정</h4>
+                <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-brand-200 transition-colors">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${isNotiEnabled ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+                            <i className={`fas ${isNotiEnabled ? 'fa-bell' : 'fa-bell-slash'}`}></i>
+                        </div>
+                        <div>
+                            <div className="text-sm font-bold text-gray-800">새 일자리 알림</div>
+                            <div className="text-xs text-gray-500">신규 일자리가 등록되면 알림을 받습니다.</div>
+                        </div>
+                    </div>
+                    
+                    {/* Toggle Switch */}
+                    <button 
+                        onClick={handleNotificationToggle}
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${isNotiEnabled ? 'bg-blue-600' : 'bg-gray-200'}`}
+                        role="switch"
+                        aria-checked={isNotiEnabled}
+                    >
+                        <span className={`${isNotiEnabled ? 'translate-x-6' : 'translate-x-1'} inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm`}/>
+                    </button>
+                </div>
              </div>
 
              <hr className="border-gray-50" />
