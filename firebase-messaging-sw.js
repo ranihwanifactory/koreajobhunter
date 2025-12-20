@@ -17,8 +17,15 @@ if (!firebase.apps.length) {
 
 const messaging = firebase.messaging();
 
-const CACHE_NAME = 'young-workforce-v12';
-const urlsToCache = ['./', './index.html', './manifest.json'];
+// 1. PWA 캐싱 및 설치 전략
+const CACHE_NAME = 'young-workforce-v15';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  'https://cdn.tailwindcss.com',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache)));
@@ -26,39 +33,59 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.map(k => k !== CACHE_NAME && caches.delete(k)))));
+  e.waitUntil(
+    caches.keys().then(ks => Promise.all(ks.map(k => k !== CACHE_NAME && caches.delete(k))))
+  );
   self.skipWaiting();
 });
 
-// 배경 메시지 처리 (앱이 닫혀있을 때)
+// 2. 배경 메시지 처리 (앱이 완전히 닫혀있을 때 작동)
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || payload.data?.title || '젊은인력 알림';
+  console.log('[SW] 배경 푸시 수신:', payload);
+  
+  const title = payload.notification?.title || payload.data?.title || '젊은인력 새 알림';
   const options = {
-    body: payload.notification?.body || payload.data?.body || '새로운 정보가 있습니다.',
+    body: payload.notification?.body || payload.data?.body || '새로운 정보가 등록되었습니다.',
     icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
     badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-    data: payload.data
+    vibrate: [200, 100, 200],
+    data: {
+      url: payload.data?.url || '/',
+      linkId: payload.data?.linkId,
+      type: payload.data?.type
+    }
   };
+
   return self.registration.showNotification(title, options);
 });
 
+// 3. 알림 클릭 시 앱 열기 및 페이지 이동
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
+  
   const data = e.notification.data;
   let targetUrl = '/';
-  
   if (data?.linkId) {
-      targetUrl = `/?tab=${data.type === 'job' ? 'jobs' : 'home'}&linkId=${data.linkId}`;
+      const tab = data.type === 'job' ? 'jobs' : 'home';
+      targetUrl = `/?tab=${tab}&linkId=${data.linkId}`;
+  } else if (data?.url) {
+      targetUrl = data.url;
   }
 
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      for (const client of clients) {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      const fullTargetUrl = new URL(targetUrl, self.location.origin).href;
+      
+      // 이미 열려있는 창이 있으면 포커스 후 이동
+      for (const client of windowClients) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus().then(c => c.navigate(targetUrl));
+          return client.focus().then(c => c.navigate(fullTargetUrl));
         }
       }
-      if (clients.openWindow) return clients.openWindow(targetUrl);
+      // 열린 창이 없으면 새 창 열기
+      if (clients.openWindow) {
+        return clients.openWindow(fullTargetUrl);
+      }
     })
   );
 });

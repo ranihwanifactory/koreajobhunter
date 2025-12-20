@@ -30,7 +30,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabView>('home');
   const [targetJobId, setTargetJobId] = useState<string | null>(null);
 
-  // Deep linking logic (from notifications)
+  // URL 파라미터 감지 (알림 클릭 대응)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab') as TabView;
@@ -42,6 +42,7 @@ function App() {
       if (!tab || tab === 'home') setActiveTab('jobs');
     }
     
+    // 주소창 깔끔하게 정리
     if (tab || linkId) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -52,28 +53,18 @@ function App() {
       setUser(currentUser);
       const adminStatus = currentUser?.email === ADMIN_EMAIL;
       setIsAdmin(adminStatus);
-      
-      // 관리자라도 처음엔 홈 화면을 보여줌 (필요할 때만 대시보드 전환)
-      if (adminStatus && !showAdminDashboard && activeTab === 'home') {
-          // 필요시 자동 전환 로직 추가 가능
-      }
-      
       setLoading(false);
 
       if (currentUser) {
         setShowAuthModal(false);
-        // 푸시 토큰 등록 시도
+        // 로그인 성공 시 푸시 토큰 등록
         requestFcmToken(currentUser.uid);
         onForegroundMessage();
       }
     });
 
     return () => unsubscribe();
-  }, [activeTab, showAdminDashboard]);
-
-  const handleCall = () => {
-    window.location.href = `tel:${BUSINESS_INFO.phone}`;
-  };
+  }, []);
 
   const handleTabChange = (tab: string) => {
       setShowAdminDashboard(false);
@@ -85,11 +76,10 @@ function App() {
       if (noti.type === 'job' && noti.linkId) {
           setActiveTab('jobs');
           setTargetJobId(noti.linkId);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
           setActiveTab('home');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (loading) {
@@ -100,11 +90,8 @@ function App() {
     );
   }
 
-  if (showAuthModal) {
-    return <Auth onCancel={() => setShowAuthModal(false)} />;
-  }
-
   const renderContent = () => {
+    // 관리자 모드 활성화 시 대시보드만 출력
     if (showAdminDashboard && isAdmin) {
         return <div className="p-4 max-w-7xl mx-auto"><AdminDashboard /></div>;
     }
@@ -113,59 +100,65 @@ function App() {
         case 'home':
             return (
                 <div className="flex flex-col gap-0 md:gap-8 pb-4">
-                    <div className="px-4 md:px-0 pt-6 md:pt-0">
-                        <HeroSection />
-                    </div>
+                    <HeroSection />
                     <WorkerTicker user={user} />
-                    <div className="px-4 md:px-0 space-y-6">
-                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                    <div className="px-4 md:px-0 space-y-6 max-w-7xl mx-auto w-full">
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                              <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
                                     <i className="fas fa-briefcase text-brand-600"></i>
-                                    최근 일자리
+                                    최근 구인 공고
                                 </h3>
-                                <button onClick={() => setActiveTab('jobs')} className="text-xs text-gray-500 font-medium hover:text-brand-600">더보기</button>
+                                <button onClick={() => setActiveTab('jobs')} className="text-xs text-brand-600 font-bold">전체보기</button>
                              </div>
-                             <div className="h-40 relative overflow-hidden rounded-xl border border-gray-50 bg-gray-50/30 flex items-center justify-center">
+                             <div className="h-48 relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50/50 flex items-center justify-center">
                                 <button 
                                     onClick={() => setActiveTab('jobs')}
-                                    className="z-10 bg-brand-600 text-white px-6 py-3 rounded-full text-sm font-bold shadow-lg hover:scale-105 transition-transform"
+                                    className="z-10 bg-brand-600 text-white px-8 py-3 rounded-full font-bold shadow-xl hover:scale-105 transition-transform"
                                 >
-                                    실시간 일자리 목록 보기
+                                    일자리 목록 확인하기
                                 </button>
-                                <div className="absolute inset-0 opacity-20 pointer-events-none">
+                                <div className="absolute inset-0 opacity-10 pointer-events-none">
                                     <JobBoard user={user} />
                                 </div>
                              </div>
                         </div>
 
                         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
                                 <i className="fas fa-map-marked-alt text-brand-600"></i>
-                                사무소 위치
+                                사무소 오시는 길
                             </h3>
-                            <div className="aspect-video w-full mb-4 shadow-inner rounded-xl overflow-hidden border border-gray-200">
+                            <div className="aspect-video w-full mb-4 shadow-inner rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
                                 <OfficeMap address={BUSINESS_INFO.address} />
                             </div>
-                             <button onClick={handleCall} className="w-full bg-slate-800 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-900 transition-shadow">
-                                <i className="fas fa-phone-alt"></i> 전화 문의하기
-                            </button>
+                             <a href={`tel:${BUSINESS_INFO.phone}`} className="w-full bg-slate-800 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-900 transition-colors">
+                                <i className="fas fa-phone-alt"></i> 전화로 문의하기
+                            </a>
                         </div>
                     </div>
                 </div>
             );
         case 'jobs':
-            return <div className="px-4 md:px-0 py-6"><JobBoard user={user} targetJobId={targetJobId} onTargetJobConsumed={() => setTargetJobId(null)} onLoginRequest={() => setShowAuthModal(true)} /></div>;
+            return <div className="px-4 md:px-0 py-6 max-w-7xl mx-auto"><JobBoard user={user} targetJobId={targetJobId} onTargetJobConsumed={() => setTargetJobId(null)} onLoginRequest={() => setShowAuthModal(true)} /></div>;
         case 'gallery':
-            return <div className="p-4"><Gallery isAdmin={isAdmin} /></div>;
+            return <div className="p-4 max-w-7xl mx-auto"><Gallery isAdmin={isAdmin} /></div>;
         case 'register':
             return (
                 <div className="p-4 max-w-2xl mx-auto">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <i className={`fas ${user ? 'fa-user-circle' : 'fa-user-plus'} text-brand-600`}></i>
-                        {user ? '나의 프로필' : '인력 등록'}
-                    </h3>
-                    {user ? <MyProfile user={user} /> : <div className="flex flex-col gap-6"><RegistrationForm user={user as any} /><div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm"><i className="fas fa-lock text-3xl text-brand-100 mb-4"></i><h3 className="font-bold mb-2">로그인이 필요합니다</h3><button onClick={() => setShowAuthModal(true)} className="bg-brand-600 text-white px-8 py-3 rounded-xl font-bold">로그인 / 회원가입</button></div></div>}
+                    {user ? <MyProfile user={user} /> : (
+                      <div className="space-y-6">
+                        <RegistrationForm user={user as any} />
+                        <div className="bg-white rounded-2xl p-10 text-center border border-gray-100 shadow-sm">
+                          <div className="w-16 h-16 bg-brand-50 text-brand-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                            <i className="fas fa-lock"></i>
+                          </div>
+                          <h3 className="font-bold text-lg mb-2">로그인이 필요합니다</h3>
+                          <p className="text-gray-500 text-sm mb-6">회원으로 등록하시면 맞춤 일자리 알림을<br/>실시간으로 받아보실 수 있습니다.</p>
+                          <button onClick={() => setShowAuthModal(true)} className="bg-brand-600 text-white px-10 py-3.5 rounded-xl font-bold shadow-lg shadow-brand-100">로그인 / 회원가입</button>
+                        </div>
+                      </div>
+                    )}
                 </div>
             );
         default: return null;
@@ -184,14 +177,25 @@ function App() {
         onTabChange={handleTabChange}
         onNotificationClick={handleNotificationClick}
       />
-      <main className="flex-grow w-full max-w-7xl mx-auto md:px-4">
+      
+      <main className="flex-grow w-full">
         {renderContent()}
       </main>
+
       {!showAdminDashboard && <Footer />}
-      {!showAdminDashboard && <BottomNav activeTab={activeTab} onTabChange={handleTabChange} user={user} />}
+      
+      {/* 모바일 하단바: showAdminDashboard가 아닐 때만 노출 */}
+      {!showAdminDashboard && (
+          <BottomNav activeTab={activeTab} onTabChange={handleTabChange} user={user} />
+      )}
+
+      {showAuthModal && <Auth onCancel={() => setShowAuthModal(false)} />}
+      
       {!showAdminDashboard && (
         <div className="md:hidden fixed bottom-24 right-4 z-40">
-          <button onClick={handleCall} className="w-14 h-14 bg-green-500 rounded-full text-white shadow-xl flex items-center justify-center text-2xl animate-bounce"><i className="fas fa-phone"></i></button>
+          <a href={`tel:${BUSINESS_INFO.phone}`} className="w-14 h-14 bg-green-500 rounded-full text-white shadow-2xl flex items-center justify-center text-2xl animate-bounce hover:scale-110 transition-transform">
+            <i className="fas fa-phone"></i>
+          </a>
         </div>
       )}
     </div>
