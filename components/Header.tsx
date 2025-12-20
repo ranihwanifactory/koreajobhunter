@@ -34,6 +34,7 @@ const Header: React.FC<HeaderProps> = ({
   const notiRef = useRef<HTMLDivElement>(null);
   
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isIOS, setIsIOS] = useState(false);
   const [userSettings, setUserSettings] = useState({ jobPostings: true, notices: true });
   const [toast, setToast] = useState<{ visible: boolean; title: string; message: string; data?: AppNotification }>({
     visible: false,
@@ -46,7 +47,10 @@ const Header: React.FC<HeaderProps> = ({
 
   // Install PWA Logic
   useEffect(() => {
-    // Fix: Access deferredPrompt via any casting to satisfy TypeScript
+    // Check iOS
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(ios);
+
     if ((window as any).deferredPrompt) setInstallPrompt((window as any).deferredPrompt);
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
@@ -58,6 +62,10 @@ const Header: React.FC<HeaderProps> = ({
   }, []);
 
   const handleInstallClick = async () => {
+    if (isIOS) {
+        alert("아이폰은 브라우저 하단의 [공유] 버튼을 누른 뒤 '홈 화면에 추가'를 선택해 주세요.");
+        return;
+    }
     if (!installPrompt) return;
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
@@ -90,41 +98,26 @@ const Header: React.FC<HeaderProps> = ({
       const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppNotification));
       setNotifications(list);
 
-      // Notification logic only for new additions after initial load
       if (!isFirstLoad.current) {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
             const newNoti = { id: change.doc.id, ...change.doc.data() } as AppNotification;
             
-            // Check user preferences
             const isJobAllowed = newNoti.type === 'job' && userSettings.jobPostings;
             const isNoticeAllowed = newNoti.type === 'notice' && userSettings.notices;
 
             if (isJobAllowed || isNoticeAllowed) {
-                // 1. Native System Push (even if app is in foreground)
-                if ("Notification" in window && Notification.permission === "granted") {
-                  try {
-                    const registration = await navigator.serviceWorker.ready;
-                    registration.showNotification(newNoti.title, {
-                      body: newNoti.message,
-                      icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-                      badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-                      vibrate: [200, 100, 200],
-                      data: { url: '/?tab=jobs', linkId: newNoti.linkId }
-                    } as any);
-                  } catch (e) { console.warn("Push failed", e); }
+                // 앱이 포그라운드일 때만 토스트 노출 (백그라운드는 SW가 담당)
+                if (document.visibilityState === 'visible') {
+                    setToast({ visible: true, title: newNoti.title, message: newNoti.message, data: newNoti });
+                    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 6000);
                 }
-
-                // 2. In-App Visual Toast
-                setToast({ visible: true, title: newNoti.title, message: newNoti.message, data: newNoti });
-                setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 6000);
                 setHasNew(true);
             }
           }
         });
       } else {
         isFirstLoad.current = false;
-        // Check for "New" badge status on load
         const lastReadTime = localStorage.getItem('lastReadNotiTime');
         if (list.length > 0 && (!lastReadTime || new Date(list[0].createdAt) > new Date(lastReadTime))) {
           setHasNew(true);
@@ -162,30 +155,25 @@ const Header: React.FC<HeaderProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-1 mr-2">
-                {['jobs', 'gallery', 'register'].map(tab => (
-                  <button key={tab} onClick={() => onTabChange?.(tab)} className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? 'text-brand-600 bg-brand-50' : 'text-gray-600 hover:bg-gray-100'}`}>
-                    {tab === 'jobs' ? '일자리' : tab === 'gallery' ? '갤러리' : '내정보'}
-                  </button>
-                ))}
-            </div>
+            {(installPrompt || isIOS) && (
+              <button 
+                onClick={handleInstallClick} 
+                className="px-3 py-1.5 bg-indigo-600 text-white text-[11px] font-bold rounded-full shadow-lg shadow-indigo-200 animate-bounce"
+              >
+                <i className="fas fa-mobile-alt mr-1"></i>앱 설치(알림받기)
+              </button>
+            )}
 
             {isAdmin && (
               <button onClick={onToggleAdmin} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors hidden sm:block ${isAdminView ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {isAdminView ? '사용자모드' : '관리자모드'}
               </button>
             )}
-
-            {installPrompt && (
-              <button onClick={handleInstallClick} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-full animate-pulse">
-                <i className="fas fa-download mr-1"></i>앱 설치
-              </button>
-            )}
             
             {user && (
               <div className="relative" ref={notiRef}>
                 <button onClick={handleBellClick} className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 relative">
-                  <i className={`fas fa-bell ${hasNew ? 'text-brand-600 animate-pulse' : ''}`}></i>
+                  <i className={`fas fa-bell ${hasNew ? 'text-brand-600' : ''}`}></i>
                   {hasNew && <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>}
                 </button>
 

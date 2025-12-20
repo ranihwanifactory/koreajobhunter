@@ -30,6 +30,28 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabView>('home');
   const [targetJobId, setTargetJobId] = useState<string | null>(null);
 
+  // Parse URL parameters for deep linking (e.g., from Push Notifications)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab') as TabView;
+    const linkId = params.get('linkId');
+
+    if (tab) {
+      setActiveTab(tab);
+    }
+    if (linkId) {
+      if (tab === 'jobs' || !tab) {
+        setTargetJobId(linkId);
+        if (!tab) setActiveTab('jobs');
+      }
+    }
+    
+    // Clear URL parameters after reading to prevent re-triggering on refresh
+    if (tab || linkId) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -78,6 +100,9 @@ function App() {
       if (noti.type === 'job' && noti.linkId) {
           setActiveTab('jobs');
           setTargetJobId(noti.linkId);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+          setActiveTab('home');
           window.scrollTo({ top: 0, behavior: 'smooth' });
       }
   };
