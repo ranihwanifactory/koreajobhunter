@@ -1,9 +1,10 @@
+
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getMessaging, isSupported } from "firebase/messaging";
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDbGBNoj53CdufejFqmA5hsyK81EyWmGuA",
   authDomain: "koreajobhunter-2cb76.firebaseapp.com",
@@ -14,9 +15,24 @@ const firebaseConfig = {
   appId: "1:427949515852:web:a3b700433b7ac764e880e9"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+/**
+ * Safely retrieves the Firebase Messaging instance after checking browser support.
+ * This prevents the "Service messaging is not available" error on unsupported environments.
+ */
+export const getMessagingInstance = async () => {
+  try {
+    if (typeof window !== 'undefined' && await isSupported()) {
+      return getMessaging(app);
+    }
+  } catch (error) {
+    console.warn("Firebase Messaging initialization failed or is not supported:", error);
+  }
+  return null;
+};
+
 export const googleProvider = new GoogleAuthProvider();

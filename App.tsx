@@ -16,6 +16,7 @@ import { BUSINESS_INFO, ADMIN_EMAIL } from './constants';
 import { auth } from './services/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { AppNotification } from './types';
+import { requestFcmToken, onForegroundMessage } from './services/fcm';
 
 type TabView = 'home' | 'jobs' | 'register' | 'gallery';
 
@@ -26,9 +27,7 @@ function App() {
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   
-  // Tab State for Mobile App-like navigation
   const [activeTab, setActiveTab] = useState<TabView>('home');
-  // State for deep linking to a specific job from notification
   const [targetJobId, setTargetJobId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,15 +36,19 @@ function App() {
       const adminStatus = currentUser?.email === ADMIN_EMAIL;
       setIsAdmin(adminStatus);
       
-      // Admin auto-dashboard logic
       if (adminStatus) {
         setShowAdminDashboard(true);
       } else {
         setShowAdminDashboard(false);
       }
+      
       setLoading(false);
+
       if (currentUser) {
         setShowAuthModal(false);
+        // Request FCM Token for push notifications
+        requestFcmToken(currentUser.uid);
+        onForegroundMessage();
       }
     });
 
