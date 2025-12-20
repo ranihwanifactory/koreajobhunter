@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'young-workforce-v2';
+const CACHE_NAME = 'young-workforce-v3';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -7,18 +7,13 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', (event) => {
-  // Perform install steps
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Clean up old caches
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -34,53 +29,54 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Navigation Fallback Strategy (App Shell)
-  // If it's a navigation request (HTML page), try network, but fall back to cached index.html
-  // This handles SPA routing and prevents 404s on launch/reload
   if (event.request.mode === 'navigate') {
     event.respondWith(
       caches.match('/index.html').then((response) => {
-        // Return cached index.html if available, otherwise fetch
-        // We prioritize cache for start speed, or you can use networkFirst
-        return response || fetch(event.request).catch(() => {
-             return caches.match('/index.html');
-        });
+        return response || fetch(event.request).catch(() => caches.match('/index.html'));
       })
     );
     return;
   }
-
-  // Stale-While-Revalidate for other resources
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
+    caches.match(event.request).then((response) => response || fetch(event.request))
   );
+});
+
+// Push Event Listener for Background Notifications
+self.addEventListener('push', function(event) {
+  if (event.data) {
+    const payload = event.data.json();
+    const options = {
+      body: payload.body,
+      icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+      badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+      vibrate: [100, 50, 100],
+      data: {
+        url: payload.url || '/',
+        linkId: payload.linkId
+      }
+    };
+    event.waitUntil(
+      self.registration.showNotification(payload.title, options)
+    );
+  }
 });
 
 // Handle notification click
 self.addEventListener('notificationclick', function(event) {
-  console.log('On notification click: ', event.notification.tag);
   event.notification.close();
 
-  // Focus window if open, otherwise open new one
   event.waitUntil(
-    clients.matchAll({
-      type: "window"
-    })
+    clients.matchAll({ type: "window", includeUncontrolled: true })
     .then(function(clientList) {
+      // If there is an open window, focus it and navigate
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
-        // More robust URL check
-        if ('focus' in client) {
-            return client.focus();
+        if (client.url === '/' && 'focus' in client) {
+          return client.focus();
         }
       }
+      // If no window is open, open a new one
       if (clients.openWindow) {
         return clients.openWindow('/');
       }
