@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { WorkerProfile } from '../types';
+import { User } from 'firebase/auth';
 
 const maskName = (name: string) => {
   if (!name) return '***';
@@ -28,26 +29,52 @@ const TickerItem: React.FC<{ worker: WorkerProfile }> = ({ worker }) => (
   </div>
 );
 
-const WorkerTicker: React.FC = () => {
+interface WorkerTickerProps {
+  user: User | null;
+}
+
+const WorkerTicker: React.FC<WorkerTickerProps> = ({ user }) => {
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
+  const [hasPermission, setHasPermission] = useState(true);
 
   useEffect(() => {
-    // onSnapshot을 사용하여 실시간으로 최근 인력 정보를 가져옵니다.
+    // Only attempt to subscribe if a user is logged in to avoid permission errors
+    if (!user) {
+      setHasPermission(false);
+      return;
+    }
+
     const q = query(collection(db, 'workers'), orderBy('updatedAt', 'desc'), limit(15));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = snapshot.docs.map(doc => doc.data() as WorkerProfile);
       setWorkers(list);
+      setHasPermission(true);
     }, (error) => {
-      console.error("Failed to fetch workers for ticker", error);
+      if (error.code === 'permission-denied') {
+        setHasPermission(false);
+        console.log("Worker ticker permission denied. Login might be required.");
+      } else {
+        console.error("Failed to fetch workers for ticker", error);
+      }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
+
+  if (!hasPermission || !user) {
+    return (
+      <div className="w-full bg-slate-900 overflow-hidden py-4 shadow-inner border-y border-slate-800 mb-8 relative">
+        <div className="flex items-center justify-center text-slate-400 text-xs gap-2">
+           <i className="fas fa-lock"></i>
+           로그인하시면 실시간 인력 현황을 보실 수 있습니다.
+        </div>
+      </div>
+    );
+  }
 
   if (workers.length === 0) return null;
 
-  // Ensure we have enough items to scroll smoothly by duplicating if list is short
   const displayList = workers.length < 5 ? [...workers, ...workers, ...workers] : workers;
 
   return (
@@ -65,14 +92,12 @@ const WorkerTicker: React.FC = () => {
            </span>
        </div>
        
-       <div className="flex overflow-hidden relative w-full mask-image-gradient-sides">
-          {/* First loop */}
+       <div className="flex overflow-hidden relative w-full no-scrollbar">
           <div className="animate-marquee flex gap-3 min-w-full shrink-0 items-center px-4">
             {displayList.map((w, i) => (
               <TickerItem key={`t1-${i}`} worker={w} />
             ))}
           </div>
-          {/* Second loop (Seamless transition) */}
           <div className="animate-marquee flex gap-3 min-w-full shrink-0 items-center px-4">
             {displayList.map((w, i) => (
               <TickerItem key={`t2-${i}`} worker={w} />

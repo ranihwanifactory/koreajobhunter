@@ -37,14 +37,13 @@ function App() {
       const adminStatus = currentUser?.email === ADMIN_EMAIL;
       setIsAdmin(adminStatus);
       
-      // Admin auto-dashboard logic only if already logged in and explicit
+      // Admin auto-dashboard logic
       if (adminStatus) {
         setShowAdminDashboard(true);
       } else {
         setShowAdminDashboard(false);
       }
       setLoading(false);
-      // Close auth modal on successful login
       if (currentUser) {
         setShowAuthModal(false);
       }
@@ -59,14 +58,12 @@ function App() {
 
   const toggleAdminView = () => {
     setShowAdminDashboard(prev => !prev);
-    // If exiting admin dashboard, go to home
     if (showAdminDashboard) {
        setActiveTab('home');
     }
   };
 
   const handleTabChange = (tab: string) => {
-      // If user clicks a tab while in admin mode, exit admin mode
       if (showAdminDashboard) {
           setShowAdminDashboard(false);
       }
@@ -76,9 +73,7 @@ function App() {
 
   const handleNotificationClick = (noti: AppNotification) => {
       if (noti.type === 'job' && noti.linkId) {
-          // Navigate to jobs tab
           setActiveTab('jobs');
-          // Set target job to open modal
           setTargetJobId(noti.linkId);
           window.scrollTo({ top: 0, behavior: 'smooth' });
       }
@@ -92,7 +87,6 @@ function App() {
     );
   }
 
-  // If Auth Modal is active, show it over the content
   if (showAuthModal) {
     return <Auth onCancel={() => setShowAuthModal(false)} />;
   }
@@ -109,10 +103,9 @@ function App() {
                     <div className="px-4 md:px-0 pt-6 md:pt-0">
                         <HeroSection />
                     </div>
-                    <WorkerTicker />
+                    <WorkerTicker user={user} />
                     
                     <div className="px-4 md:px-0 space-y-6">
-                        {/* Preview of Jobs on Home */}
                         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                              <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -127,20 +120,18 @@ function App() {
                                 </button>
                              </div>
                              <div className="h-40 relative overflow-hidden">
-                                {/* Only show a teaser here, users should go to Jobs tab */}
-                                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white flex items-end justify-center pb-2 z-10">
+                                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/90 flex items-end justify-center pb-2 z-10">
                                     <button 
                                         onClick={() => setActiveTab('jobs')}
-                                        className="bg-gray-100 text-gray-600 px-4 py-2 rounded-full text-sm font-bold hover:bg-gray-200 transition-colors shadow-sm"
+                                        className="bg-brand-600 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-brand-700 transition-colors shadow-md"
                                     >
                                         일자리 목록 전체보기
                                     </button>
                                 </div>
-                                <JobBoard /> 
+                                <JobBoard user={user} /> 
                              </div>
                         </div>
 
-                        {/* Location / Contact Card */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                             <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                 <i className="fas fa-map-marked-alt text-brand-600"></i>
@@ -164,8 +155,10 @@ function App() {
             return (
                 <div className="px-4 md:px-0 py-6">
                     <JobBoard 
+                        user={user}
                         targetJobId={targetJobId} 
                         onTargetJobConsumed={() => setTargetJobId(null)}
+                        onLoginRequest={() => setShowAuthModal(true)}
                     />
                 </div>
             );
@@ -187,10 +180,6 @@ function App() {
                     ) : (
                         <div className="flex flex-col gap-6">
                             <RegistrationForm user={user as any} /> 
-                            {/* Note: RegistrationForm handles !user internally by showing login prompt if we passed null, 
-                                but logically we might want to just show the login prompt here directly. 
-                                The existing RegistrationForm handles !user gracefully. 
-                            */}
                             {!user && (
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center animate-fade-in">
                                     <div className="w-16 h-16 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -226,23 +215,14 @@ function App() {
         onToggleAdmin={toggleAdminView} 
         isAdminView={showAdminDashboard}
         onLoginClick={() => setShowAuthModal(true)}
-        
-        // Map header interactions to tab changes
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        // Notification click handler
         onNotificationClick={handleNotificationClick}
       />
-      
-      {/* Main Container */}
       <main className="flex-grow w-full max-w-7xl mx-auto px-0 md:px-4 py-0 md:py-6">
         {renderContent()}
       </main>
-
-      {/* Footer - Only show on Home or Desktop to save space on mobile functionality pages */}
       {(activeTab === 'home' || window.innerWidth >= 768) && <Footer />}
-      
-      {/* Mobile Bottom Navigation */}
       {!showAdminDashboard && (
           <BottomNav 
             activeTab={activeTab} 
@@ -250,8 +230,6 @@ function App() {
             user={user}
           />
       )}
-      
-      {/* Sticky Bottom Call Button for Mobile - Positioned above BottomNav */}
       {!showAdminDashboard && (
         <div className="lg:hidden fixed bottom-20 right-4 z-40">
           <button 

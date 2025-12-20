@@ -39,6 +39,7 @@ export interface WorkerProfile {
   // Settings
   notificationSettings?: {
     jobPostings: boolean;
+    notices: boolean; // Added notices toggle
   };
 }
 
