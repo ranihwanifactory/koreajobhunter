@@ -12,19 +12,9 @@ interface HeaderProps {
   onToggleAdmin?: () => void;
   isAdminView?: boolean;
   onLoginClick?: () => void;
-  
-  // Refactored props for unified navigation
   activeTab?: string;
   onTabChange?: (tab: string) => void;
-
-  // Notification click handler
   onNotificationClick?: (notification: AppNotification) => void;
-}
-
-declare global {
-  interface Window {
-    deferredPrompt: any;
-  }
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -43,16 +33,8 @@ const Header: React.FC<HeaderProps> = ({
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const notiRef = useRef<HTMLDivElement>(null);
   
-  // Install Prompt State
   const [installPrompt, setInstallPrompt] = useState<any>(null);
-  
-  // User settings
-  const [userSettings, setUserSettings] = useState({
-      jobPostings: true,
-      notices: true
-  });
-
-  // State for In-App Toast Notification
+  const [userSettings, setUserSettings] = useState({ jobPostings: true, notices: true });
   const [toast, setToast] = useState<{ visible: boolean; title: string; message: string; data?: AppNotification }>({
     visible: false,
     title: '',
@@ -60,61 +42,29 @@ const Header: React.FC<HeaderProps> = ({
     data: undefined
   });
   
-  // Ref to track if it's the initial data load
   const isFirstLoad = useRef(true);
 
-  // Install PWA Logic (Existing)
+  // Install PWA Logic
   useEffect(() => {
-    if (window.deferredPrompt) {
-      setInstallPrompt(window.deferredPrompt);
-    }
+    // Fix: Access deferredPrompt via any casting to satisfy TypeScript
+    if ((window as any).deferredPrompt) setInstallPrompt((window as any).deferredPrompt);
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setInstallPrompt(e);
-      window.deferredPrompt = e;
+      (window as any).deferredPrompt = e;
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    const handleAppInstalled = () => {
-      setInstallPrompt(null);
-      window.deferredPrompt = null;
-    };
-    window.addEventListener('appinstalled', handleAppInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   const handleInstallClick = async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-        setInstallPrompt(null);
-        window.deferredPrompt = null;
-    }
+    if (outcome === 'accepted') setInstallPrompt(null);
   };
 
-  // Load dismissed notifications (Existing)
-  useEffect(() => {
-    if (user) {
-      const key = `dismissed_notis_${user.uid}`;
-      try {
-        const stored = localStorage.getItem(key);
-        if (stored) setDismissedIds(JSON.parse(stored));
-      } catch (e) {}
-    } else {
-      setDismissedIds([]);
-    }
-  }, [user]);
-
-  const saveDismissedIds = (ids: string[]) => {
-    if (!user) return;
-    setDismissedIds(ids);
-    localStorage.setItem(`dismissed_notis_${user.uid}`, JSON.stringify(ids));
-  };
-
-  // Listen to user profile for notification settings
+  // Load user settings
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, 'workers', user.uid), (docSnap) => {
@@ -129,57 +79,54 @@ const Header: React.FC<HeaderProps> = ({
     return () => unsub();
   }, [user]);
 
-  // 알림 가져오기 및 실시간 리스너
+  // Unified Notification Listener (Push + Toast)
   useEffect(() => {
     if (!user) return;
 
-    const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(20));
+    const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(15));
     isFirstLoad.current = true;
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppNotification));
       setNotifications(list);
 
+      // Notification logic only for new additions after initial load
       if (!isFirstLoad.current) {
-        for (const change of snapshot.docChanges()) {
+        snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
-            const newNoti = change.doc.data() as AppNotification;
+            const newNoti = { id: change.doc.id, ...change.doc.data() } as AppNotification;
             
-            // Filter based on settings
-            const allowNoti = (newNoti.type === 'job' && userSettings.jobPostings) || 
-                             (newNoti.type === 'notice' && userSettings.notices);
+            // Check user preferences
+            const isJobAllowed = newNoti.type === 'job' && userSettings.jobPostings;
+            const isNoticeAllowed = newNoti.type === 'notice' && userSettings.notices;
 
-            if (!allowNoti) continue;
+            if (isJobAllowed || isNoticeAllowed) {
+                // 1. Native System Push (even if app is in foreground)
+                if ("Notification" in window && Notification.permission === "granted") {
+                  try {
+                    const registration = await navigator.serviceWorker.ready;
+                    registration.showNotification(newNoti.title, {
+                      body: newNoti.message,
+                      icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                      badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+                      vibrate: [200, 100, 200],
+                      data: { url: '/?tab=jobs', linkId: newNoti.linkId }
+                    } as any);
+                  } catch (e) { console.warn("Push failed", e); }
+                }
 
-            if ("Notification" in window && Notification.permission === "granted") {
-              try {
-                  const registration = await navigator.serviceWorker.ready;
-                  if (registration) {
-                      registration.showNotification(newNoti.title, {
-                          body: newNoti.message,
-                          icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-                          badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-                          vibrate: [200, 100, 200],
-                          tag: newNoti.type,
-                          data: { url: '/', linkId: newNoti.linkId }
-                      } as any);
-                  }
-              } catch (e) {
-                console.error("Notification trigger failed", e);
-              }
+                // 2. In-App Visual Toast
+                setToast({ visible: true, title: newNoti.title, message: newNoti.message, data: newNoti });
+                setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 6000);
+                setHasNew(true);
             }
-
-            setToast({ visible: true, title: newNoti.title, message: newNoti.message, data: newNoti });
-            setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 6000);
           }
-        }
+        });
       } else {
         isFirstLoad.current = false;
-      }
-
-      const lastReadTime = localStorage.getItem('lastReadNotiTime');
-      if (list.length > 0) {
-        if (!lastReadTime || new Date(list[0].createdAt) > new Date(lastReadTime)) {
+        // Check for "New" badge status on load
+        const lastReadTime = localStorage.getItem('lastReadNotiTime');
+        if (list.length > 0 && (!lastReadTime || new Date(list[0].createdAt) > new Date(lastReadTime))) {
           setHasNew(true);
         }
       }
@@ -188,24 +135,11 @@ const Header: React.FC<HeaderProps> = ({
     return () => unsubscribe();
   }, [user, userSettings]);
 
-  // External click handler (Existing)
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (notiRef.current && !notiRef.current.contains(event.target as Node)) {
-        setShowNoti(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const visibleNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
-
   const handleBellClick = () => {
     setShowNoti(!showNoti);
-    if (!showNoti && notifications.length > 0) {
+    if (!showNoti) {
       setHasNew(false);
-      localStorage.setItem('lastReadNotiTime', notifications[0].createdAt);
+      if (notifications.length > 0) localStorage.setItem('lastReadNotiTime', notifications[0].createdAt);
     }
   };
 
@@ -214,40 +148,20 @@ const Header: React.FC<HeaderProps> = ({
     setShowNoti(false);
   };
 
-  const handleDeleteNoti = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    saveDismissedIds([...dismissedIds, id]);
-  };
-
-  const handleShare = async () => {
-    const shareData = {
-      title: BUSINESS_INFO.name,
-      text: `${BUSINESS_INFO.name} 인력 등록 앱입니다.`,
-      url: window.location.href,
-    };
-    if (navigator.share) {
-      try { await navigator.share(shareData); } catch (err) {}
-    } else { alert('URL이 복사되었습니다: ' + window.location.href); }
-  };
-
-  const handleToastClick = () => {
-    if (toast.data && onNotificationClick) onNotificationClick(toast.data);
-    setToast(prev => ({ ...prev, visible: false }));
-  };
+  const visibleNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
 
   return (
     <>
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <a href="/" onClick={(e) => { e.preventDefault(); if (onTabChange) onTabChange('home'); }} className="flex items-center gap-2">
-              <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm shadow-brand-200">젊</div>
+            <a href="/" onClick={(e) => { e.preventDefault(); onTabChange?.('home'); }} className="flex items-center gap-2">
+              <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-sm">젊</div>
               <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight hidden xs:block">{BUSINESS_INFO.name}</h1>
             </a>
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-1 mr-2">
                 {['jobs', 'gallery', 'register'].map(tab => (
                   <button key={tab} onClick={() => onTabChange?.(tab)} className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${activeTab === tab ? 'text-brand-600 bg-brand-50' : 'text-gray-600 hover:bg-gray-100'}`}>
@@ -268,8 +182,6 @@ const Header: React.FC<HeaderProps> = ({
               </button>
             )}
             
-            <button onClick={handleShare} className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600"><i className="fas fa-share-alt"></i></button>
-            
             {user && (
               <div className="relative" ref={notiRef}>
                 <button onClick={handleBellClick} className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 relative">
@@ -281,11 +193,10 @@ const Header: React.FC<HeaderProps> = ({
                   <div className="absolute top-12 right-0 w-80 bg-white shadow-xl rounded-xl border border-gray-100 overflow-hidden z-50 animate-fade-in-up">
                     <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                       <h3 className="font-bold text-sm text-gray-800">알림 센터</h3>
-                      <button onClick={() => saveDismissedIds(notifications.map(n => n.id))} className="text-xs text-gray-400 hover:text-red-500">모두 지우기</button>
                     </div>
                     <div className="max-h-80 overflow-y-auto">
                       {visibleNotifications.length === 0 ? (
-                        <div className="p-6 text-center text-gray-500 text-sm">새로운 알림이 없습니다.</div>
+                        <div className="p-6 text-center text-gray-500 text-sm">최근 알림이 없습니다.</div>
                       ) : (
                         <ul className="divide-y divide-gray-100">
                           {visibleNotifications.map((noti) => (
@@ -294,11 +205,10 @@ const Header: React.FC<HeaderProps> = ({
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${noti.type === 'job' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
                                   <i className={`fas ${noti.type === 'job' ? 'fa-briefcase' : 'fa-bullhorn'} text-xs`}></i>
                                 </div>
-                                <div className="flex-1 pr-4">
+                                <div className="flex-1">
                                   <h4 className="text-sm font-bold text-gray-800 mb-1">{noti.title}</h4>
                                   <p className="text-xs text-gray-600 leading-snug line-clamp-2">{noti.message}</p>
                                 </div>
-                                <button onClick={(e) => handleDeleteNoti(e, noti.id)} className="absolute top-3 right-3 text-gray-300 hover:text-red-500 p-1"><i className="fas fa-times text-sm"></i></button>
                               </div>
                             </li>
                           ))}
@@ -320,9 +230,9 @@ const Header: React.FC<HeaderProps> = ({
       </header>
       
       {toast.visible && (
-        <div onClick={handleToastClick} className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-brand-100 p-4 animate-fade-in-up flex items-start gap-4 ring-1 ring-brand-500/20 cursor-pointer">
+        <div onClick={() => toast.data && onNotificationClick?.(toast.data)} className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-[90%] max-w-sm bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-brand-100 p-4 animate-fade-in-up flex items-start gap-4 ring-1 ring-brand-500/20 cursor-pointer">
           <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
-             <i className="fas fa-bell ring-4 ring-brand-50 rounded-full animate-pulse"></i>
+             <i className="fas fa-bell animate-pulse"></i>
           </div>
           <div className="flex-1">
              <h4 className="font-bold text-gray-900 text-sm mb-0.5">{toast.title}</h4>

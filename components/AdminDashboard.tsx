@@ -18,9 +18,6 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterJobType, setFilterJobType] = useState<string>(''); 
   const [filterLocation, setFilterLocation] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<WorkerProfile>>({});
-  const [isAdding, setIsAdding] = useState(false);
 
   // --- Job Management States ---
   const [jobs, setJobs] = useState<JobPosting[]>([]);
@@ -83,16 +80,21 @@ const AdminDashboard: React.FC = () => {
         await updateDoc(doc(db, 'job_postings', editingJobId), { ...jobForm });
         alert('수정되었습니다.');
       } else {
+        // 1. Job Document Creation
         const docRef = await addDoc(collection(db, 'job_postings'), { ...jobForm, createdAt: now });
-        // Send Notification automatically
+        
+        // 2. Automated Push Notification Creation
+        // This triggers the Header.tsx listener on all client devices
         await addDoc(collection(db, 'notifications'), {
           title: `[새 일자리] ${jobForm.content}`,
           message: `${jobForm.companyName} | 급여: ${jobForm.pay} | 위치: ${jobForm.address}`,
           createdAt: now,
           type: 'job',
-          linkId: docRef.id
+          linkId: docRef.id,
+          url: '/?tab=jobs' // Helper for SW routing
         });
-        alert('일자리가 등록되었으며 사용자들에게 알림이 발송되었습니다.');
+        
+        alert('일자리가 등록되었으며 사용자들에게 푸시 알림이 발송되었습니다.');
       }
       setIsAddingJob(false);
       setEditingJobId(null);
@@ -112,7 +114,6 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  // --- Notice Functions ---
   const handleSendNotice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNotice.title || !newNotice.message) return alert('내용을 입력하세요.');
@@ -175,7 +176,7 @@ const AdminDashboard: React.FC = () => {
                      <h4 className="font-bold text-gray-900 text-lg">{w.name}</h4>
                      <p className="text-sm text-brand-600 font-medium">{w.phone}</p>
                    </div>
-                   <button onClick={() => handleDeleteJob(w.id!)} className="text-gray-300 hover:text-red-500"><i className="fas fa-trash-alt"></i></button>
+                   <button onClick={() => deleteDoc(doc(db, 'workers', w.id!))} className="text-gray-300 hover:text-red-500"><i className="fas fa-trash-alt"></i></button>
                  </div>
                  <div className="flex flex-wrap gap-1 mb-3">
                    {w.desiredJobs.map(j => <span key={j} className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-600">{j}</span>)}
@@ -206,7 +207,7 @@ const AdminDashboard: React.FC = () => {
                  <input placeholder="업체명/현장명" value={jobForm.companyName} onChange={e => setJobForm({...jobForm, companyName: e.target.value})} className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
                  <input placeholder="연락처 (문의 받을 번호)" value={jobForm.contact} onChange={e => setJobForm({...jobForm, contact: e.target.value})} className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
                  <div className="md:col-span-2">
-                   <input placeholder="상세 업무 내용 (예: 동탄 물류센터 상하차)" value={jobForm.content} onChange={e => setJobForm({...jobForm, content: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
+                   <input placeholder="상세 업무 내용 (예: 성주 비닐하우스 수확)" value={jobForm.content} onChange={e => setJobForm({...jobForm, content: e.target.value})} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
                  </div>
                  <input placeholder="급여 (예: 16만원)" value={jobForm.pay} onChange={e => setJobForm({...jobForm, pay: e.target.value})} className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
                  <input placeholder="근무 날짜/기간" value={jobForm.date} onChange={e => setJobForm({...jobForm, date: e.target.value})} className="p-3 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
@@ -218,7 +219,7 @@ const AdminDashboard: React.FC = () => {
                    <span className="text-sm font-bold text-red-500">긴급구인 표시</span>
                  </label>
                  <button type="submit" className="md:col-span-2 bg-brand-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-brand-700 transition-all">
-                   {editingJobId ? '수정 완료' : '등록 및 알림 발송'}
+                   {editingJobId ? '수정 완료' : '등록 및 즉시 알림 발송'}
                  </button>
                </form>
              </div>
@@ -253,7 +254,7 @@ const AdminDashboard: React.FC = () => {
            <div className="bg-white p-8 rounded-2xl border border-brand-100 shadow-lg">
              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
                <i className="fas fa-paper-plane text-brand-600"></i>
-               공지사항 및 소식 전체 발송
+               전체 공지사항 발송
              </h2>
              <form onSubmit={handleSendNotice} className="space-y-4">
                <input placeholder="알림 제목" value={newNotice.title} onChange={e => setNewNotice({...newNotice, title: e.target.value})} className="w-full p-4 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:bg-white focus:border-brand-500" />
@@ -265,14 +266,17 @@ const AdminDashboard: React.FC = () => {
            </div>
            
            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-             <div className="p-4 bg-gray-50 border-b font-bold text-sm">최근 발송 내역</div>
+             <div className="p-4 bg-gray-50 border-b font-bold text-sm">최근 알림 발송 내역</div>
              <div className="divide-y divide-gray-100">
                {notifications.map(n => (
                  <div key={n.id} className="p-4 flex justify-between items-center group">
                    <div>
-                     <h5 className="font-bold text-sm text-gray-800">{n.title}</h5>
-                     <p className="text-xs text-gray-500 truncate max-w-md">{n.message}</p>
-                     <span className="text-[10px] text-gray-400">{new Date(n.createdAt).toLocaleString()}</span>
+                     <span className={`text-[10px] px-2 py-0.5 rounded-full mr-2 ${n.type === 'job' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                        {n.type === 'job' ? '일자리' : '공지'}
+                     </span>
+                     <h5 className="inline font-bold text-sm text-gray-800">{n.title}</h5>
+                     <p className="text-xs text-gray-500 truncate max-w-md mt-1">{n.message}</p>
+                     <span className="text-[10px] text-gray-400 block mt-1">{new Date(n.createdAt).toLocaleString()}</span>
                    </div>
                    <button onClick={() => deleteDoc(doc(db, 'notifications', n.id))} className="text-gray-300 group-hover:text-red-500 transition-colors"><i className="fas fa-trash-alt"></i></button>
                  </div>

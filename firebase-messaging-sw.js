@@ -16,7 +16,7 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 // 2. PWA Caching Logic
-const CACHE_NAME = 'young-workforce-v8';
+const CACHE_NAME = 'young-workforce-v9';
 const urlsToCache = [
   './',
   './index.html',
@@ -42,21 +42,18 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Navigation request strategy: Network first, fallback to cached index.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => caches.match('./index.html'))
     );
     return;
   }
-  
-  // General static assets strategy: Cache first, then network
   event.respondWith(
     caches.match(event.request).then((res) => res || fetch(event.request))
   );
 });
 
-// 3. FCM Background Message Handler
+// 3. FCM Background Message Handler (Critical for Job Alerts)
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background Message Received:', payload);
   
@@ -68,7 +65,8 @@ messaging.onBackgroundMessage((payload) => {
     vibrate: [200, 100, 200],
     data: {
       url: payload.data?.url || './',
-      linkId: payload.data?.linkId
+      linkId: payload.data?.linkId,
+      type: payload.data?.type || 'notice'
     }
   };
 
@@ -79,20 +77,21 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
-  const targetUrl = event.notification.data?.url || './';
+  // Navigate to specific URL with params to trigger frontend logic
+  let targetUrl = event.notification.data?.url || './';
+  if (event.notification.data?.linkId) {
+      targetUrl = `./?tab=${event.notification.data.type === 'job' ? 'jobs' : 'home'}&linkId=${event.notification.data.linkId}`;
+  }
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Create a full URL for comparison
       const fullTargetUrl = new URL(targetUrl, self.location.origin).href;
       
-      // If a window is already open, focus it
       for (let client of windowClients) {
         if (client.url.includes(targetUrl) && 'focus' in client) {
           return client.focus();
         }
       }
-      // If no window is open, open a new one
       if (clients.openWindow) {
         return clients.openWindow(fullTargetUrl);
       }

@@ -96,24 +96,15 @@
       // Service Worker Registration
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          try {
-            // Construct absolute URL for the service worker to match the current origin exactly.
-            // This bypasses issues where relative paths might resolve to the editor domain.
-            const swPath = 'firebase-messaging-sw.js';
-            const registrationUrl = new URL(swPath, window.location.origin + window.location.pathname).href;
-            
-            console.log('Registering Service Worker at:', registrationUrl);
-            
-            navigator.serviceWorker.register(registrationUrl)
-              .then(registration => {
-                console.log('Service Worker registered successfully with scope:', registration.scope);
-              })
-              .catch(err => {
-                console.error('Service Worker registration failed:', err);
-              });
-          } catch (e) {
-            console.error('Error during Service Worker setup:', e);
-          }
+          // Using a simple relative path is the most reliable way to register
+          // the service worker on the same origin as the current page.
+          navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: './' })
+            .then(registration => {
+              console.log('Service Worker registered successfully with scope:', registration.scope);
+            })
+            .catch(err => {
+              console.error('Service Worker registration failed:', err);
+            });
         });
       }
     </script>

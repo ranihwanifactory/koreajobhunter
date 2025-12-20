@@ -1,8 +1,6 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { JobType } from "../types";
-
-// Check if API key is available
-const isApiKeyAvailable = !!process.env.API_KEY;
 
 export const generateWorkerIntro = async (
   name: string, 
@@ -10,11 +8,13 @@ export const generateWorkerIntro = async (
   location: string
 ): Promise<string> => {
   
-  if (!isApiKeyAvailable) {
+  // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+  if (!process.env.API_KEY) {
     return "API 키가 설정되지 않았습니다. 관리자에게 문의하세요.";
   }
 
   try {
+    // Always use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const jobList = jobs.join(", ");
@@ -29,11 +29,13 @@ export const generateWorkerIntro = async (
       존댓말을 사용하세요.
     `;
 
+    // Use gemini-3-flash-preview for basic text tasks as per guidelines.
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
+    // The GenerateContentResponse object features a text property (not a method).
     return response.text || "자기소개 생성에 실패했습니다.";
   } catch (error) {
     console.error("Gemini API Error:", error);
