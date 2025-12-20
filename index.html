@@ -93,6 +93,20 @@
         window.deferredPrompt = e;
         console.log('beforeinstallprompt captured');
       });
+
+      // Service Worker Registration moved here to ensure correct origin resolution
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          // Register from the document context so "./" resolves to the user content domain
+          navigator.serviceWorker.register('./firebase-messaging-sw.js')
+            .then(registration => {
+              console.log('Service Worker registered successfully from index.html:', registration);
+            })
+            .catch(err => {
+              console.error('Service Worker registration failed from index.html:', err);
+            });
+        });
+      }
     </script>
   <script type="module" src="/index.tsx"></script>
 </body>
