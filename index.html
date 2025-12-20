@@ -91,20 +91,29 @@
         e.preventDefault();
         // Stash the event so it can be triggered later.
         window.deferredPrompt = e;
-        console.log('beforeinstallprompt captured');
       });
 
-      // Service Worker Registration moved here to ensure correct origin resolution
+      // Service Worker Registration
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          // Register from the document context so "./" resolves to the user content domain
-          navigator.serviceWorker.register('./firebase-messaging-sw.js')
-            .then(registration => {
-              console.log('Service Worker registered successfully from index.html:', registration);
-            })
-            .catch(err => {
-              console.error('Service Worker registration failed from index.html:', err);
-            });
+          try {
+            // Construct absolute URL for the service worker to match the current origin exactly.
+            // This bypasses issues where relative paths might resolve to the editor domain.
+            const swPath = 'firebase-messaging-sw.js';
+            const registrationUrl = new URL(swPath, window.location.origin + window.location.pathname).href;
+            
+            console.log('Registering Service Worker at:', registrationUrl);
+            
+            navigator.serviceWorker.register(registrationUrl)
+              .then(registration => {
+                console.log('Service Worker registered successfully with scope:', registration.scope);
+              })
+              .catch(err => {
+                console.error('Service Worker registration failed:', err);
+              });
+          } catch (e) {
+            console.error('Error during Service Worker setup:', e);
+          }
         });
       }
     </script>

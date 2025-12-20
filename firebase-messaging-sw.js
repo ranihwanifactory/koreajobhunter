@@ -16,7 +16,7 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 // 2. PWA Caching Logic
-const CACHE_NAME = 'young-workforce-v6';
+const CACHE_NAME = 'young-workforce-v8';
 const urlsToCache = [
   './',
   './index.html',
@@ -83,6 +83,9 @@ self.addEventListener('notificationclick', (event) => {
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Create a full URL for comparison
+      const fullTargetUrl = new URL(targetUrl, self.location.origin).href;
+      
       // If a window is already open, focus it
       for (let client of windowClients) {
         if (client.url.includes(targetUrl) && 'focus' in client) {
@@ -91,7 +94,7 @@ self.addEventListener('notificationclick', (event) => {
       }
       // If no window is open, open a new one
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(fullTargetUrl);
       }
     })
   );
