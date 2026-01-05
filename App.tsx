@@ -236,7 +236,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900 pb-16 md:pb-0">
+    <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900 pb-20 md:pb-24">
       <Header 
         user={user} 
         isAdmin={isAdmin} 
