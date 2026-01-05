@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { WorkerProfile, JobType } from '../types';
 import { JOB_TYPES_LIST } from '../constants';
-import { User } from 'firebase/auth';
+// Fix: Use type-only import for User from firebase/auth
+import { type User } from 'firebase/auth';
 import { db, storage, ref, uploadBytesResumable, getDownloadURL } from '../services/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import LocationPickerMap from './LocationPickerMap';
@@ -198,21 +199,28 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ user, workerId, onC
                 </div>
              </div>
 
-             <div className="space-y-3">
+             <div className="space-y-4">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                    <i className="fas fa-map-marker-alt text-brand-500"></i> 거주지 주소 설정
+                    <i className="fas fa-map-marker-alt text-brand-500"></i> 거주지 위치 설정
                 </h3>
-                <input 
-                    type="text" 
-                    readOnly
-                    value={formData.location.addressString || '지도를 클릭해 주소를 설정하세요'} 
-                    className="w-full p-4 bg-gray-100 border border-gray-200 rounded-2xl text-sm font-medium outline-none" 
-                />
+                
                 <LocationPickerMap 
                     latitude={formData.location.latitude} 
                     longitude={formData.location.longitude} 
                     onLocationSelect={(lat, lng, addr) => setFormData({...formData, location: { latitude: lat, longitude: lng, addressString: addr }})} 
                 />
+
+                <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-start gap-3">
+                    <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                        <i className="fas fa-info-circle text-xs"></i>
+                    </div>
+                    <div>
+                        <p className="text-[11px] font-bold text-blue-900 mb-1">설정된 주소</p>
+                        <p className="text-sm font-bold text-blue-700 leading-tight">
+                            {formData.location.addressString || '위의 지도에서 주소를 검색하거나 클릭하세요.'}
+                        </p>
+                    </div>
+                </div>
              </div>
 
              <div className="flex gap-4">

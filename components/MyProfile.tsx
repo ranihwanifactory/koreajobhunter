@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
+// Fix: Use type-only import for User from firebase/auth
+import { type User } from 'firebase/auth';
 import { db } from '../services/firebase';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { WorkerProfile } from '../types';

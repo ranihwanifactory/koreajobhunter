@@ -12,9 +12,11 @@ import MyProfile from './components/MyProfile';
 import Gallery from './components/Gallery';
 import OfficeMap from './components/OfficeMap';
 import BottomNav from './components/BottomNav';
+import IntroScreen from './components/IntroScreen';
 import { BUSINESS_INFO, ADMIN_EMAIL } from './constants';
 import { auth } from './services/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+// Fix: Use correct modular imports for onAuthStateChanged and User type
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { AppNotification } from './types';
 import { requestFcmToken, onForegroundMessage } from './services/fcm';
 
@@ -23,12 +25,21 @@ type TabView = 'home' | 'jobs' | 'register' | 'gallery';
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showIntro, setShowIntro] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   
   const [activeTab, setActiveTab] = useState<TabView>('home');
   const [targetJobId, setTargetJobId] = useState<string | null>(null);
+
+  // Manage Intro Screen Timeout
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowIntro(false);
+    }, 2800); // Intro lasts for 2.8s
+    return () => clearTimeout(timer);
+  }, []);
 
   // Parse URL parameters for deep linking (e.g., from Push Notifications)
   useEffect(() => {
@@ -106,6 +117,10 @@ function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
       }
   };
+
+  if (showIntro) {
+    return <IntroScreen />;
+  }
 
   if (loading) {
     return (
@@ -236,7 +251,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900 pb-20 md:pb-24">
+    <div className="min-h-screen flex flex-col bg-gray-50 font-sans text-gray-900 pb-20 md:pb-24 animate-fade-in">
       <Header 
         user={user} 
         isAdmin={isAdmin} 

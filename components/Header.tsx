@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BUSINESS_INFO } from '../constants';
 import { auth, db } from '../services/firebase';
-import { User } from 'firebase/auth';
+// Fix: Use type-only import for User to resolve member export error
+import { type User } from 'firebase/auth';
 import { collection, query, orderBy, limit, onSnapshot, doc } from 'firebase/firestore';
 import { AppNotification, WorkerProfile } from '../types';
 

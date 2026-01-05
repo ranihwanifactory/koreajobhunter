@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { JobPosting } from '../types';
-import { User } from 'firebase/auth';
+// Fix: Use modular type-only import for User
+import { type User } from 'firebase/auth';
 
 interface JobBoardProps {
   user: User | null;

@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { auth, googleProvider } from '../services/firebase';
+// Fix: Use modular imports for auth functions from firebase/auth
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { BUSINESS_INFO } from '../constants';
 

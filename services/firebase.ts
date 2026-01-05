@@ -1,5 +1,6 @@
 
 import { initializeApp } from "firebase/app";
+// Fix: Use correct modular imports for Auth service and providers
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 // Import storage utilities from firebase/storage

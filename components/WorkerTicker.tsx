@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { WorkerProfile } from '../types';
-import { User } from 'firebase/auth';
+// Fix: Use modular type-only import for User
+import { type User } from 'firebase/auth';
 
 const maskName = (name: string) => {
   if (!name) return '***';

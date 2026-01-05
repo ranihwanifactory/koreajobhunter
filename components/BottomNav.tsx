@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { User } from 'firebase/auth';
+// Fix: Use modular type-only import for User
+import { type User } from 'firebase/auth';
 
 interface BottomNavProps {
   activeTab: string;
