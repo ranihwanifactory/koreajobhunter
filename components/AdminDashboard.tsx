@@ -5,6 +5,7 @@ import { collection, doc, deleteDoc, updateDoc, addDoc, query, orderBy, onSnapsh
 import { WorkerProfile, JobPosting, AppNotification, JobType } from '../types';
 import { JOB_TYPES_LIST } from '../constants';
 import WorkerMap from './WorkerMap';
+import RegistrationForm from './RegistrationForm';
 
 type AdminTab = 'workers' | 'jobs' | 'notices';
 
@@ -16,6 +17,7 @@ const AdminDashboard: React.FC = () => {
   const [workerLoading, setWorkerLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddingWorker, setIsAddingWorker] = useState(false);
+  const [editingWorkerId, setEditingWorkerId] = useState<string | null>(null);
   
   const [workerForm, setWorkerForm] = useState<Partial<WorkerProfile>>({
     name: '',
@@ -203,7 +205,7 @@ const AdminDashboard: React.FC = () => {
           {(['workers', 'jobs', 'notices'] as AdminTab[]).map(tab => (
             <button
               key={tab}
-              onClick={() => { setActiveTab(tab); setIsAddingJob(false); setIsAddingWorker(false); setEditingJobId(null); }}
+              onClick={() => { setActiveTab(tab); setIsAddingJob(false); setIsAddingWorker(false); setEditingWorkerId(null); setEditingJobId(null); }}
               className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === tab ? 'bg-brand-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
             >
               <i className={`fas fa-${tab === 'workers' ? 'users' : tab === 'jobs' ? 'briefcase' : 'bullhorn'} mr-2`}></i>
@@ -227,12 +229,24 @@ const AdminDashboard: React.FC = () => {
                />
              </div>
              <button 
-                onClick={() => setIsAddingWorker(!isAddingWorker)}
+                onClick={() => { setIsAddingWorker(!isAddingWorker); setEditingWorkerId(null); }}
                 className="w-full md:w-auto px-6 py-3 bg-brand-600 text-white font-bold rounded-xl shadow-md hover:bg-brand-700 transition-colors whitespace-nowrap"
              >
                 {isAddingWorker ? '닫기' : '+ 인력 직접 등록'}
              </button>
            </div>
+
+           {editingWorkerId && (
+              <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={() => setEditingWorkerId(null)}>
+                  <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <RegistrationForm 
+                        workerId={editingWorkerId} 
+                        onCancel={() => setEditingWorkerId(null)} 
+                        onSuccess={() => { setEditingWorkerId(null); alert('정보가 수정되었습니다.'); }} 
+                    />
+                  </div>
+              </div>
+           )}
 
            {isAddingWorker && (
              <div className="bg-white p-8 rounded-3xl border-2 border-brand-100 shadow-2xl animate-fade-in-up">
@@ -309,7 +323,10 @@ const AdminDashboard: React.FC = () => {
                      <h4 className="font-bold text-gray-900 text-lg">{w.name}</h4>
                      <p className="text-sm text-brand-600 font-medium">{w.phone}</p>
                    </div>
-                   <button onClick={() => { if(window.confirm('인력을 삭제하시겠습니까?')) deleteDoc(doc(db, 'workers', w.id!)); }} className="text-gray-300 hover:text-red-500 p-2"><i className="fas fa-trash-alt"></i></button>
+                   <div className="flex gap-2">
+                     <button onClick={() => setEditingWorkerId(w.id!)} className="text-blue-500 hover:text-blue-700 text-sm font-bold p-1 transition-colors">수정</button>
+                     <button onClick={() => { if(window.confirm('인력을 삭제하시겠습니까?')) deleteDoc(doc(db, 'workers', w.id!)); }} className="text-gray-300 hover:text-red-500 p-1 transition-colors"><i className="fas fa-trash-alt"></i></button>
+                   </div>
                  </div>
                  <div className="flex flex-wrap gap-1 mb-3">
                    {w.desiredJobs.map(j => <span key={j} className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-600">{j}</span>)}
@@ -321,7 +338,7 @@ const AdminDashboard: React.FC = () => {
                  
                  <div className="mt-4 pt-3 border-t border-gray-50 flex gap-2">
                     <a href={`tel:${w.phone}`} className="flex-1 bg-brand-50 text-brand-600 text-center py-2 rounded-lg text-xs font-bold hover:bg-brand-100">전화</a>
-                    <button className="flex-1 bg-gray-50 text-gray-500 text-center py-2 rounded-lg text-xs font-bold hover:bg-gray-100">상세정보</button>
+                    <button onClick={() => setEditingWorkerId(w.id!)} className="flex-1 bg-gray-50 text-gray-500 text-center py-2 rounded-lg text-xs font-bold hover:bg-gray-100">상세정보/수정</button>
                  </div>
                </div>
              ))}
@@ -373,8 +390,8 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-bold text-gray-900 text-lg leading-tight">{job.content}</h4>
                       <div className="flex gap-2">
-                        <button onClick={() => startEditJob(job)} className="text-blue-500 text-sm hover:underline font-bold">수정</button>
-                        <button onClick={() => handleDeleteJob(job.id!)} className="text-red-500 text-sm hover:underline font-bold">삭제</button>
+                        <button onClick={() => startEditJob(job)} className="text-blue-500 text-sm hover:underline font-bold transition-colors">수정</button>
+                        <button onClick={() => handleDeleteJob(job.id!)} className="text-red-500 text-sm hover:underline font-bold transition-colors">삭제</button>
                       </div>
                     </div>
                     <p className="text-sm text-brand-600 font-bold mb-3">{job.companyName}</p>
