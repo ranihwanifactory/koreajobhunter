@@ -1,9 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import { db, storage } from '../services/firebase';
-import { collection, getDocs, doc, deleteDoc, updateDoc, addDoc, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { WorkerProfile, JobType, JobPosting, AppNotification } from '../types';
+import { db } from '../services/firebase';
+import { collection, doc, deleteDoc, updateDoc, addDoc, query, orderBy, onSnapshot, limit, setDoc } from 'firebase/firestore';
+import { WorkerProfile, JobPosting, AppNotification, JobType } from '../types';
 import { JOB_TYPES_LIST } from '../constants';
 import WorkerMap from './WorkerMap';
 
@@ -16,8 +15,18 @@ const AdminDashboard: React.FC = () => {
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
   const [workerLoading, setWorkerLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterJobType, setFilterJobType] = useState<string>(''); 
-  const [filterLocation, setFilterLocation] = useState('');
+  const [isAddingWorker, setIsAddingWorker] = useState(false);
+  
+  const [workerForm, setWorkerForm] = useState<Partial<WorkerProfile>>({
+    name: '',
+    phone: '',
+    bankName: '',
+    accountNumber: '',
+    desiredJobs: [],
+    location: { latitude: null, longitude: null, addressString: '' },
+    introduction: '',
+    isAgreed: true,
+  });
 
   // --- Job Management States ---
   const [jobs, setJobs] = useState<JobPosting[]>([]);
@@ -69,6 +78,65 @@ const AdminDashboard: React.FC = () => {
     return () => unsubscribe?.();
   }, [activeTab]);
 
+  // --- Worker Functions ---
+  const handleWorkerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workerForm.name || !workerForm.phone) return alert('이름과 연락처는 필수입니다.');
+
+    try {
+      setWorkerLoading(true);
+      
+      // 주소 입력 시 좌표 추출 시도 (카카오 SDK 활용)
+      let finalLat = workerForm.location?.latitude;
+      let finalLng = workerForm.location?.longitude;
+
+      if (workerForm.location?.addressString && (!finalLat || !finalLng)) {
+          const geocoder = new window.kakao.maps.services.Geocoder();
+          const coordPromise = new Promise<{lat: number, lng: number} | null>((resolve) => {
+              geocoder.addressSearch(workerForm.location!.addressString, (result: any, status: any) => {
+                  if (status === window.kakao.maps.services.Status.OK) {
+                      resolve({ lat: parseFloat(result[0].y), lng: parseFloat(result[0].x) });
+                  } else resolve(null);
+              });
+          });
+          const coords = await coordPromise;
+          if (coords) {
+              finalLat = coords.lat;
+              finalLng = coords.lng;
+          }
+      }
+
+      const dataToSave = {
+        ...workerForm,
+        location: {
+            ...workerForm.location,
+            latitude: finalLat || null,
+            longitude: finalLng || null,
+        },
+        updatedAt: new Date().toISOString(),
+        isManagedByAdmin: true // 관리자가 등록했다는 플래그
+      };
+
+      await addDoc(collection(db, 'workers'), dataToSave);
+      alert('인력이 성공적으로 등록되었습니다.');
+      setIsAddingWorker(false);
+      setWorkerForm({ name: '', phone: '', bankName: '', accountNumber: '', desiredJobs: [], location: { latitude: null, longitude: null, addressString: '' }, introduction: '', isAgreed: true });
+    } catch (e) {
+      alert('인력 등록 중 오류가 발생했습니다.');
+    } finally {
+      setWorkerLoading(false);
+    }
+  };
+
+  const toggleWorkerJobType = (val: JobType) => {
+      const current = [...(workerForm.desiredJobs || [])];
+      if (current.includes(val)) {
+          setWorkerForm({ ...workerForm, desiredJobs: current.filter(j => j !== val) });
+      } else {
+          setWorkerForm({ ...workerForm, desiredJobs: [...current, val] });
+      }
+  };
+
   // --- Job Functions ---
   const handleJobSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,20 +148,15 @@ const AdminDashboard: React.FC = () => {
         await updateDoc(doc(db, 'job_postings', editingJobId), { ...jobForm });
         alert('수정되었습니다.');
       } else {
-        // 1. Job Document Creation
         const docRef = await addDoc(collection(db, 'job_postings'), { ...jobForm, createdAt: now });
-        
-        // 2. Automated Push Notification Creation
-        // This triggers the Header.tsx listener on all client devices
         await addDoc(collection(db, 'notifications'), {
           title: `[새 일자리] ${jobForm.content}`,
           message: `${jobForm.companyName} | 급여: ${jobForm.pay} | 위치: ${jobForm.address}`,
           createdAt: now,
           type: 'job',
           linkId: docRef.id,
-          url: '/?tab=jobs' // Helper for SW routing
+          url: '/?tab=jobs'
         });
-        
         alert('일자리가 등록되었으며 사용자들에게 푸시 알림이 발송되었습니다.');
       }
       setIsAddingJob(false);
@@ -140,7 +203,7 @@ const AdminDashboard: React.FC = () => {
           {(['workers', 'jobs', 'notices'] as AdminTab[]).map(tab => (
             <button
               key={tab}
-              onClick={() => { setActiveTab(tab); setIsAddingJob(false); setEditingJobId(null); }}
+              onClick={() => { setActiveTab(tab); setIsAddingJob(false); setIsAddingWorker(false); setEditingJobId(null); }}
               className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === tab ? 'bg-brand-600 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
             >
               <i className={`fas fa-${tab === 'workers' ? 'users' : tab === 'jobs' ? 'briefcase' : 'bullhorn'} mr-2`}></i>
@@ -163,25 +226,103 @@ const AdminDashboard: React.FC = () => {
                  className="w-full pl-11 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:bg-white outline-none"
                />
              </div>
-             <div className="text-sm font-bold text-gray-500">총 {filteredWorkers.length}명</div>
+             <button 
+                onClick={() => setIsAddingWorker(!isAddingWorker)}
+                className="w-full md:w-auto px-6 py-3 bg-brand-600 text-white font-bold rounded-xl shadow-md hover:bg-brand-700 transition-colors whitespace-nowrap"
+             >
+                {isAddingWorker ? '닫기' : '+ 인력 직접 등록'}
+             </button>
            </div>
+
+           {isAddingWorker && (
+             <div className="bg-white p-8 rounded-3xl border-2 border-brand-100 shadow-2xl animate-fade-in-up">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                    <i className="fas fa-user-plus text-brand-600"></i>
+                    인력 정보 수동 등록
+                </h3>
+                <form onSubmit={handleWorkerSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500 ml-1">이름 *</label>
+                            <input required placeholder="홍길동" value={workerForm.name} onChange={e => setWorkerForm({...workerForm, name: e.target.value})} className="w-full p-3.5 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500 ml-1">연락처 *</label>
+                            <input required placeholder="010-0000-0000" value={workerForm.phone} onChange={e => setWorkerForm({...workerForm, phone: e.target.value})} className="w-full p-3.5 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 ml-1">희망/가능 직종 (복수 선택)</label>
+                        <div className="flex flex-wrap gap-2">
+                            {JOB_TYPES_LIST.map(job => (
+                                <button 
+                                    key={job.value} 
+                                    type="button" 
+                                    onClick={() => toggleWorkerJobType(job.value)}
+                                    className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${workerForm.desiredJobs?.includes(job.value) ? 'bg-brand-600 text-white border-brand-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+                                >
+                                    <i className={`fas ${job.icon} mr-1`}></i> {job.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500 ml-1">계좌 정보 (은행/계좌번호)</label>
+                            <div className="flex gap-2">
+                                <input placeholder="은행명" value={workerForm.bankName} onChange={e => setWorkerForm({...workerForm, bankName: e.target.value})} className="w-1/3 p-3.5 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
+                                <input placeholder="계좌번호" value={workerForm.accountNumber} onChange={e => setWorkerForm({...workerForm, accountNumber: e.target.value})} className="flex-1 p-3.5 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500 ml-1">거주지 주소 (동/읍/면 단위 권장)</label>
+                            <input placeholder="성주군 성주읍..." value={workerForm.location?.addressString} onChange={e => setWorkerForm({...workerForm, location: {...workerForm.location!, addressString: e.target.value}})} className="w-full p-3.5 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 ml-1">메모/소개</label>
+                        <textarea placeholder="특기 사항 및 경력 메모" value={workerForm.introduction} onChange={e => setWorkerForm({...workerForm, introduction: e.target.value})} className="w-full p-3.5 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-brand-500 h-24" />
+                    </div>
+
+                    <button type="submit" className="w-full bg-brand-600 text-white font-bold py-4 rounded-xl shadow-xl hover:bg-brand-700 transition-all flex items-center justify-center gap-2">
+                        {workerLoading ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-save"></i> 인력 데이터베이스 저장</>}
+                    </button>
+                </form>
+             </div>
+           )}
            
-           <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm"><WorkerMap workers={filteredWorkers} /></div>
+           <div className="rounded-3xl overflow-hidden border border-gray-200 shadow-sm">
+             <WorkerMap workers={filteredWorkers} />
+           </div>
            
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
              {filteredWorkers.map(w => (
-               <div key={w.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+               <div key={w.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                 {w.isManagedByAdmin && (
+                     <div className="absolute top-0 right-0 bg-slate-100 text-slate-500 text-[9px] px-2 py-0.5 rounded-bl-lg font-bold">수동등록</div>
+                 )}
                  <div className="flex justify-between items-start mb-3">
                    <div>
                      <h4 className="font-bold text-gray-900 text-lg">{w.name}</h4>
                      <p className="text-sm text-brand-600 font-medium">{w.phone}</p>
                    </div>
-                   <button onClick={() => deleteDoc(doc(db, 'workers', w.id!))} className="text-gray-300 hover:text-red-500"><i className="fas fa-trash-alt"></i></button>
+                   <button onClick={() => { if(window.confirm('인력을 삭제하시겠습니까?')) deleteDoc(doc(db, 'workers', w.id!)); }} className="text-gray-300 hover:text-red-500 p-2"><i className="fas fa-trash-alt"></i></button>
                  </div>
                  <div className="flex flex-wrap gap-1 mb-3">
                    {w.desiredJobs.map(j => <span key={j} className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-600">{j}</span>)}
                  </div>
-                 <p className="text-xs text-gray-500 line-clamp-2 italic">"{w.introduction}"</p>
+                 {w.location?.addressString && (
+                     <p className="text-[11px] text-gray-400 mb-2"><i className="fas fa-map-marker-alt mr-1"></i> {w.location.addressString}</p>
+                 )}
+                 <p className="text-xs text-gray-500 line-clamp-2 italic">"{w.introduction || '메모 없음'}"</p>
+                 
+                 <div className="mt-4 pt-3 border-t border-gray-50 flex gap-2">
+                    <a href={`tel:${w.phone}`} className="flex-1 bg-brand-50 text-brand-600 text-center py-2 rounded-lg text-xs font-bold hover:bg-brand-100">전화</a>
+                    <button className="flex-1 bg-gray-50 text-gray-500 text-center py-2 rounded-lg text-xs font-bold hover:bg-gray-100">상세정보</button>
+                 </div>
                </div>
              ))}
            </div>
@@ -227,7 +368,7 @@ const AdminDashboard: React.FC = () => {
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              {jobs.map(job => (
-               <div key={job.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+               <div key={job.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between transition-all hover:shadow-md">
                  <div>
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-bold text-gray-900 text-lg leading-tight">{job.content}</h4>
@@ -242,7 +383,10 @@ const AdminDashboard: React.FC = () => {
                       <p><i className="fas fa-map-marker-alt w-4"></i> {job.address}</p>
                     </div>
                  </div>
-                 <div className="text-[10px] text-gray-400 border-t pt-3">등록일: {new Date(job.createdAt).toLocaleString()}</div>
+                 <div className="text-[10px] text-gray-400 border-t pt-3 flex justify-between">
+                    <span>등록일: {new Date(job.createdAt).toLocaleString()}</span>
+                    <span className="text-brand-500 font-bold">게시중</span>
+                 </div>
                </div>
              ))}
            </div>
@@ -251,7 +395,7 @@ const AdminDashboard: React.FC = () => {
 
       {activeTab === 'notices' && (
         <div className="animate-fade-in space-y-6">
-           <div className="bg-white p-8 rounded-2xl border border-brand-100 shadow-lg">
+           <div className="bg-white p-8 rounded-3xl border border-brand-100 shadow-lg">
              <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
                <i className="fas fa-paper-plane text-brand-600"></i>
                전체 공지사항 발송
@@ -265,11 +409,11 @@ const AdminDashboard: React.FC = () => {
              </form>
            </div>
            
-           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+           <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
              <div className="p-4 bg-gray-50 border-b font-bold text-sm">최근 알림 발송 내역</div>
              <div className="divide-y divide-gray-100">
                {notifications.map(n => (
-                 <div key={n.id} className="p-4 flex justify-between items-center group">
+                 <div key={n.id} className="p-4 flex justify-between items-center group hover:bg-gray-50">
                    <div>
                      <span className={`text-[10px] px-2 py-0.5 rounded-full mr-2 ${n.type === 'job' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
                         {n.type === 'job' ? '일자리' : '공지'}
@@ -278,7 +422,7 @@ const AdminDashboard: React.FC = () => {
                      <p className="text-xs text-gray-500 truncate max-w-md mt-1">{n.message}</p>
                      <span className="text-[10px] text-gray-400 block mt-1">{new Date(n.createdAt).toLocaleString()}</span>
                    </div>
-                   <button onClick={() => deleteDoc(doc(db, 'notifications', n.id))} className="text-gray-300 group-hover:text-red-500 transition-colors"><i className="fas fa-trash-alt"></i></button>
+                   <button onClick={() => deleteDoc(doc(db, 'notifications', n.id))} className="text-gray-300 group-hover:text-red-500 transition-colors p-2"><i className="fas fa-trash-alt"></i></button>
                  </div>
                ))}
              </div>
