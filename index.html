@@ -1,131 +1,170 @@
+import React, { useState, useEffect } from 'react';
+import { Bell, BellOff, Check, X } from 'lucide-react';
 
-<!DOCTYPE html>
-<html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>젊은인력 - 인력 등록 및 관리</title>
-    <link rel="manifest" href="/manifest.json" />
-       <!-- Google AdSense -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3195939510837246" crossorigin="anonymous"></script>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <!-- Kakao Maps SDK -->
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=08318a127595566819a1c38d00deaab2&libraries=services"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              brand: {
-                50: '#eff6ff',
-                100: '#dbeafe',
-                500: '#3b82f6',
-                600: '#2563eb',
-                700: '#1d4ed8',
-                900: '#1e3a8a',
-              }
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.5s ease-out',
-              'fade-in-up': 'fadeInUp 0.5s ease-out',
-              'marquee': 'marquee 30s linear infinite',
-              'scale-in': 'scaleIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              'slide-up-fade': 'slideUpFade 0.6s ease-out forwards',
-              'pulse-soft': 'pulseSoft 2s infinite',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              fadeInUp: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1' },
-              },
-              marquee: {
-                '0%': { transform: 'translateX(0%)' },
-                '100%': { transform: 'translateX(-100%)' },
-              },
-              scaleIn: {
-                '0%': { transform: 'scale(0.5)', opacity: '0' },
-                '100%': { transform: 'scale(1)', opacity: '1' },
-              },
-              slideUpFade: {
-                '0%': { transform: 'translateY(20px)', opacity: '0' },
-                '100%': { transform: 'translateY(0)', opacity: '1' },
-              },
-              pulseSoft: {
-                '0%, 100%': { transform: 'scale(1)', opacity: '0.8' },
-                '50%': { transform: 'scale(1.05)', opacity: '1' },
-              }
-            }
-          }
-        }
+export default function PushNotificationApp() {
+  const [permission, setPermission] = useState('default');
+  const [isSupported, setIsSupported] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    // Service Worker 및 알림 지원 확인
+    if ('serviceWorker' in navigator && 'Notification' in window) {
+      setIsSupported(true);
+      setPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestPermission = async () => {
+    try {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+      
+      if (result === 'granted') {
+        setMessage('알림 권한이 허용되었습니다!');
+        // Service Worker 등록
+        registerServiceWorker();
+      } else {
+        setMessage('알림 권한이 거부되었습니다.');
       }
-    </script>
-    <style>
-      body {
-        -webkit-tap-highlight-color: transparent;
-        background-color: #f3f4f6;
-      }
-      /* Hide scrollbar for Chrome, Safari and Opera */
-      .no-scrollbar::-webkit-scrollbar {
-          display: none;
-      }
-      /* Hide scrollbar for IE, Edge and Firefox */
-      .no-scrollbar {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-    "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
-    "firebase/storage": "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js",
-    "firebase/messaging": "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js",
-    "firebase/": "https://esm.sh/firebase@^12.7.0/"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
-  <body>
-    <div id="root"></div>
-    <script>
-      // Global logic to capture the install prompt early
-      window.deferredPrompt = null;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent the mini-infobar from appearing on mobile
-        e.preventDefault();
-        // Stash the event so it can be triggered later.
-        window.deferredPrompt = e;
+    } catch (error) {
+      setMessage('오류: ' + error.message);
+    }
+  };
+
+  const registerServiceWorker = async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      setMessage('Service Worker가 등록되었습니다!');
+      console.log('SW registered:', registration);
+    } catch (error) {
+      setMessage('Service Worker 등록 실패: ' + error.message);
+      console.error('SW registration failed:', error);
+    }
+  };
+
+  const sendTestNotification = () => {
+    if (permission === 'granted') {
+      new Notification('테스트 알림', {
+        body: '푸시 알림이 정상적으로 작동합니다!',
+        icon: '/icon.png',
+        badge: '/badge.png',
+        tag: 'test-notification',
+        requireInteraction: false
       });
+      setMessage('테스트 알림을 전송했습니다.');
+    } else {
+      setMessage('먼저 알림 권한을 허용해주세요.');
+    }
+  };
 
-      // Service Worker Registration
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          // Using a simple relative path is the most reliable way to register
-          // the service worker on the same origin as the current page.
-          navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: './' })
-            .then(registration => {
-              console.log('Service Worker registered successfully with scope:', registration.scope);
-            })
-            .catch(err => {
-              console.error('Service Worker registration failed:', err);
-            });
-        });
-      }
-    </script>
-  <script type="module" src="/index.tsx"></script>
-</body>
-</html>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <div className="flex items-center gap-4 mb-6">
+            <Bell className="w-10 h-10 text-indigo-600" />
+            <h1 className="text-3xl font-bold text-gray-800">푸시 알림 앱</h1>
+          </div>
+
+          {/* 환경 경고 */}
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  <strong>Claude Artifacts 환경에서는 Service Worker가 작동하지 않습니다.</strong>
+                  <br />이 코드를 복사하여 자체 서버에서 실행하세요.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 지원 여부 */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h2 className="font-semibold text-gray-700 mb-2">환경 확인</h2>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                {isSupported ? (
+                  <Check className="w-5 h-5 text-green-500" />
+                ) : (
+                  <X className="w-5 h-5 text-red-500" />
+                )}
+                <span className="text-sm">
+                  Service Worker 지원: {isSupported ? '예' : '아니오'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {permission === 'granted' ? (
+                  <Check className="w-5 h-5 text-green-500" />
+                ) : permission === 'denied' ? (
+                  <X className="w-5 h-5 text-red-500" />
+                ) : (
+                  <BellOff className="w-5 h-5 text-gray-400" />
+                )}
+                <span className="text-sm">
+                  알림 권한 상태: {
+                    permission === 'granted' ? '허용됨' :
+                    permission === 'denied' ? '거부됨' : '미설정'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 버튼 영역 */}
+          <div className="space-y-4 mb-6">
+            <button
+              onClick={requestPermission}
+              disabled={permission === 'granted'}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+            >
+              {permission === 'granted' ? '알림 권한 허용됨' : '알림 권한 요청'}
+            </button>
+
+            <button
+              onClick={sendTestNotification}
+              disabled={permission !== 'granted'}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+            >
+              테스트 알림 보내기
+            </button>
+          </div>
+
+          {/* 메시지 표시 */}
+          {message && (
+            <div className="p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
+              <p className="text-sm text-blue-700">{message}</p>
+            </div>
+          )}
+
+          {/* 설치 가이드 */}
+          <div className="mt-8 p-6 bg-gray-50 rounded-lg">
+            <h2 className="font-bold text-gray-800 mb-4">자체 호스팅 가이드</h2>
+            <ol className="space-y-3 text-sm text-gray-700">
+              <li className="flex gap-2">
+                <span className="font-semibold min-w-[24px]">1.</span>
+                <span>이 코드를 HTML 파일로 저장하세요.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold min-w-[24px]">2.</span>
+                <span>프로젝트 루트에 <code className="bg-gray-200 px-2 py-1 rounded">sw.js</code> 파일을 생성하세요 (아래 코드 참조).</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold min-w-[24px]">3.</span>
+                <span>HTTPS로 제공되는 서버에 배포하세요 (localhost는 HTTP 가능).</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="font-semibold min-w-[24px]">4.</span>
+                <span>Vercel, Netlify, GitHub Pages 등을 사용할 수 있습니다.</span>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
